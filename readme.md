@@ -3,16 +3,16 @@
 
 ```mermaid
 flowchart LR
-    subgraph MapStateABI [Struktura Map State ABI]
-        A[Wysokosc mapy - 2 Bajty max 32767]:::blue
-        B[Szerokosc mapy - 2 Bajty max 32767]:::brown
-        C[Ilosc graczy - 2 Bajty max 32767]:::green
-        D[Aktualny gracz - 2 Bajty max 32767]:::teal
-        E[Aktualna tura - 4 Bajty max 4294967295]:::lightblue
-        F[Ilosc prowincji - 4 Bajty max 1067720976]:::pink
-        G[Stany hexow - 1 Bajt * ilosc hexow]:::red
-        H[Kolory hexow - 2 Bajty * ilosc hexow lub 1 Bajt * ilosc hexow]:::violet
-        I[Stan finansowy prowincji - 4 Bajty * ilosc prowincji]:::darkgreen
+    subgraph mapStateABI
+        A[Map height - <br> 2 Bytes]:::blue
+        B[Map width - <br> 2 Bytes]:::brown
+        C[Player count - <br> 2 Bytes]:::green
+        D[Current player - <br> 2 Bytes]:::teal
+        E[Current round - <br> 4 Bytes]:::lightblue
+        F[Provice count - <br> 4 Bytes]:::pink
+        G[Hex state <br> 1 Byte * hex count]:::red
+        H[Hex color - <br> 2 Bytes * hex count <br> 1 Bajt * hex count]:::violet
+        I[Hex finance state - <br> 4 Bytes * provice count]:::darkgreen
     end
 
     classDef blue fill:#4da6ff,stroke:#000,color:#fff;
