@@ -24,7 +24,7 @@ flowchart LR
     classDef red fill:#ff6666,stroke:#000,color:#000;
     classDef violet fill:#ffccff,stroke:#000,color:#000;
     classDef darkgreen fill:#009933,stroke:#000,color:#fff;
-    style mapStateABI fill:#ffffff,stroke:#000,stroke-width:1px,color:#000;
+    style mapStateABI fill:none,stroke:#000,stroke-width:1px,color:#000;
 ```
 ### Map State ABI – Memory Layout
 
@@ -33,18 +33,88 @@ Each cell corresponds to a specific piece of information about the map, players,
 
 ### Map State ABI – Memory Layout
 
-| Field                | Size (Bytes) | Type              | Description                                                                 | Max Value / Range                  |
-|-----------------------|--------------|-------------------|-----------------------------------------------------------------------------|------------------------------------|
-| **Map height**        | 2            | `uint16`          | Number of rows (vertical size of the map).                                  | 65,535                             |
-| **Map width**         | 2            | `uint16`          | Number of columns (horizontal size of the map).                             | 65,535                             |
-| **Player count**      | 2            | `uint16`          | Number of players in the game.                                              | 65,535                             |
-| **Current player**    | 2            | `uint16`          | Index of the currently active player.                                       | 65,535                             |
-| **Current round**     | 4            | `uint32`          | Current round/turn number.                                                  | 4,294,967,295                      |
-| **Province count**    | 4            | `uint32`          | Number of provinces (groups of hexes).                                      | 4,294,967,295                      |
-| **Hex state**         | 1 * (height × width) | `uint8[]`         | Stores the state of each hex tile (terrain/building/unit).                   | Max size: 4,294,967,225 bytes ≈ 4.29 GB |
-| **Hex color**         | 2 * (height × width) | `uint16[]`        | Stores the color/ownership of each hex tile (2 bytes per hex).               | Max size: 8.59 GB                  |
-|                       | 1 * (height × width) | `uint8[]`         | Alternative compact mode (1 byte per hex).                                  | Max size: 4.29 GB                  |
-| **Hex finance state** | 4 * province count   | `int32[]`         | Stores the financial state (gold/money) of each province.                   | -2,147,483,648 to 2,147,483,647    |
+<table>
+  <thead>
+    <tr>
+      <td>Field</td>
+      <td>Size (Bytes)</td>
+      <td>Type</td>
+      <td>Description</td>
+      <td>Max Value / Range</td>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>Map height</b></td>
+      <td>2</td>
+      <td><code>uint16</code></td>
+      <td>Number of rows (vertical size of the map).</td>
+      <td>65,535</td>
+    </tr>
+    <tr>
+      <td><b>Map width</b></td>
+      <td>2</td>
+      <td><code>uint16</code></td>
+      <td>Number of columns (horizontal size of the map).</td>
+      <td>65,535</td>
+    </tr>
+    <tr>
+      <td><b>Player count</b></td>
+      <td>2</td>
+      <td><code>uint16</code></td>
+      <td>Number of players in the game.</td>
+      <td>65,535</td>
+    </tr>
+    <tr>
+      <td><b>Current player</b></td>
+      <td>2</td>
+      <td><code>uint16</code></td>
+      <td>Index of the currently active player.</td>
+      <td>65,535</td>
+    </tr>
+    <tr>
+      <td><b>Current round</b></td>
+      <td>4</td>
+      <td><code>uint32</code></td>
+      <td>Current round/turn number.</td>
+      <td>4,294,967,295</td>
+    </tr>
+    <tr>
+      <td><b>Province count</b></td>
+      <td>4</td>
+      <td><code>uint32</code></td>
+      <td>Number of provinces (groups of hexes).</td>
+      <td>4,294,967,295</td>
+    </tr>
+    <tr>
+      <td><b>Hex state</b></td>
+      <td>1 * (height × width)</td>
+      <td><code>uint8[]</code></td>
+      <td>Stores the state of each hex tile (terrain/building/unit). Max size: 4,294,967,225 bytes ≈ 4.29 GB</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td =><b>Hex color</b></td>
+      <td>(1 or 2) * (height × width)</td>
+      <td><code>uint8[] or uint16[]</code></td>
+      <td>Stores the color/ownership of each hex tile. (1 byte per hex, when player count &lt; 256) Alternative (2 bytes per hex, when player count &gt;= 256). Max size: 8.59 GB</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>uint8[]</code></td>
+      <td>Alternative compact mode (1 byte per hex). Max size: 4.29 GB</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td><b>Hex finance state</b></td>
+      <td>4 * province count</td>
+      <td><code>int32[]</code></td>
+      <td>Stores the financial state (gold/money) of each province.</td>
+      <td>-2,147,483,648 to 2,147,483,647</td>
+    </tr>
+  </tbody>
+</table>
 
 ### Hex State Legend
 
@@ -103,4 +173,11 @@ xSize is a variable responsible for width of the map
 
 playerCount is a variable responsible for number of players in current game
 
+## Functions
+<code>mapGenerate(int16 arg1): [mapState](#mapstateabi) </code>: Generates map with given dimenstions, returns pointer to [`mapState`](#mapstateabi).
 
+`mapGenerate(int16 arg1): mapState`: Generates map with given dimenstions, returns pointer to [`mapState`](#mapstateabi).
+
+`mapGenerate(int16 arg1): mapState`: Generates map with given dimenstions, returns pointer to [`mapState`](#mapstateabi).
+
+`mapGenerate(int16 arg1): mapState`: Generates map with given dimenstions, returns pointer to [`mapState`](#mapstateabi).
