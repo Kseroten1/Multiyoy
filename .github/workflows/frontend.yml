@@ -41,7 +41,11 @@ jobs:
         with:
           bun-version: latest 
       - name: run bun build
-        run: bunx --bun vite build
+        run: |
+          bunx --bun vite build
+          pwd
+          ls
+          ls dist
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
