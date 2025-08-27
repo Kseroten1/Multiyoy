@@ -28,6 +28,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,6 +40,8 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest 
+      - name: run bun build
+        run: bunx --bun vite build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
