@@ -42,7 +42,7 @@ jobs:
           bun-version: latest 
       - name: run bun build
         run: |
-          bunx --bun vite build --base=/multiyoy/
+          bunx --bun vite build --base=/Multiyoy/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
