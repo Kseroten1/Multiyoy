@@ -42,15 +42,12 @@ jobs:
           bun-version: latest 
       - name: run bun build
         run: |
-          bunx --bun vite build
-          pwd
-          ls
-          ls dist
+          bunx --bun vite build --base=/Multiyoy/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload folder dist
-          path: /home/runner/work/Multiyoy/Multiyoy/frontend/dist
+          path: ./frontend/dist
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
