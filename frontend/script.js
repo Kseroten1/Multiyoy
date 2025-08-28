@@ -1,2 +1,2 @@
-const mainContainer = document.getElementById('game_container');
+const mainContainer = document.getElementById('main');
 mainContainer.textContent = 'Multiyoy';
