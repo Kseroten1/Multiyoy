@@ -50,10 +50,16 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
 gl.useProgram(program);
 
 const vertices = new Float32Array([
-    //   x,    y,    r,   g,   b
-    0.0,  0.8,   1.0, 0.0, 0.0,   // góra: czerwony
-    -0.9, -0.8,   0.0, 1.0, 0.0,   // lewo: zielony
-    0.9, -0.8,   0.0, 0.0, 1.0    // prawo: niebieski
+    //   x,     y,     r,   g,   b
+    // Trójkąt 1: lewy-dolny, lewy-górny, prawy-górny
+    -0.5, -0.5,  1.0, 0.0, 0.0,  // LB - czerwony
+    -0.5,  0.5,  0.0, 1.0, 0.0,  // LG - zielony
+    0.5,  0.5,  0.0, 0.0, 1.0,  // PG - niebieski
+
+    // Trójkąt 2: lewy-dolny, prawy-górny, prawy-dolny
+    -0.5, -0.5,  1.0, 0.0, 0.0,  // LB - czerwony
+    0.5,  0.5,  0.0, 0.0, 1.0,  // PG - niebieski
+    0.5, -0.5,  1.0, 1.0, 0.0   // PD - żółty
 ]);
 
 const vertexBuffer = gl.createBuffer();                // make an empty GPU buffer
@@ -88,15 +94,15 @@ gl.vertexAttribPointer(
 gl.clearColor(0.07, 0.07, 0.07, 1); // background color
 
 function draw() {
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * window.devicePixelRatio;
-    canvas.height = rect.height * window.devicePixelRatio;
+    //const rect = canvas.getBoundingClientRect();
+    canvas.width = 700;
+    canvas.height = 700;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT);    // paint the background
-    gl.drawArrays(gl.TRIANGLES, 0, 3);// draw 1 triangle from 3 points
+    gl.drawArrays(gl.TRIANGLES, 0, 6);// draw 1 triangle from 3 points
 }
 
 draw()
-window.addEventListener('resize', () => {
+/*window.addEventListener('resize', () => {
     draw()
-});
+});*/
