@@ -51,19 +51,25 @@ gl.useProgram(program);
 
 const vertices = new Float32Array([
     //   x,     y,     r,   g,   b
-    // Trójkąt 1: lewy-dolny, lewy-górny, prawy-górny
-    -0.5, -0.5,  1.0, 0.0, 0.0,  // LB - czerwony
-    -0.5,  0.5,  0.0, 1.0, 0.0,  // LG - zielony
-    0.5,  0.5,  0.0, 0.0, 1.0,  // PG - niebieski
-
-    // Trójkąt 2: lewy-dolny, prawy-górny, prawy-dolny
-    -0.5, -0.5,  1.0, 0.0, 0.0,  // LB - czerwony
-    0.5,  0.5,  0.0, 0.0, 1.0,  // PG - niebieski
-    0.5, -0.5,  1.0, 1.0, 0.0   // PD - żółty
+    -0.9, -0.9,  1.0, 0.0, 0.0,  // 0: lewy-dolny (LB)
+    -0.9,  0.9,  0.0, 1.0, 0.0,  // 1: lewy-górny (LG)
+    0.9,  0.9,  0.0, 0.0, 1.0,  // 2: prawy-górny (PG)
+    0.9, -0.9,  1.0, 1.0, 0.0   // 3: prawy-dolny (PD)
 ]);
 
-const vertexBuffer = gl.createBuffer();                // make an empty GPU buffer
-gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);          // select it as current
+// Indeksy (re-użycie wierzchołków)
+const indices = new Uint16Array([
+    0, 1, 2,   // trójkąt górny-lewy -> górny-prawy
+    0, 2, 3    // trójkąt dolny-lewy -> dolny-prawy
+]);
+
+const indexBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+// BUFOR NA WIERZCHOŁKI 
+const vertexBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
 const aPosLoc = gl.getAttribLocation(program, 'a_pos');
@@ -99,7 +105,8 @@ function draw() {
     canvas.height = 700;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT);    // paint the background
-    gl.drawArrays(gl.TRIANGLES, 0, 6); // draw 2 triangles, 3 vertices each -> 6 vertices total
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0); /*draw 2 triangles, 3 vertices each -> 6 vertices total, 
+    we have declared 4 points (vertices table), but the points are re-used, using the specific index (indices table)*/
 }
 
 draw()
