@@ -58,7 +58,7 @@ const radius = 0.9;
 let vertexBuffer = null;
 let vertCount = 0;
 
-// Generator fan’a
+// Generator fan’a - funckcja potrzebna przez suwak -> przy zmianie ilości punktów 
 function generateCircleFan(segments) {
     const count = 1 + segments + 1; // center + ring + closing
     const data = new Float32Array(count * 5);
