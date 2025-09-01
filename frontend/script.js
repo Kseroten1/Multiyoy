@@ -105,7 +105,8 @@ function draw() {
     canvas.height = 700;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT);    // paint the background
-    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0); /*draw 2 triangles, 3 vertices each -> 6 vertices total, 
+    we have declared 4 points (vertices table), but the points are re-used, using the specific index (indices table)*/
 }
 
 draw()
