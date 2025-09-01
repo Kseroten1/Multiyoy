@@ -49,66 +49,95 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
 }
 gl.useProgram(program);
 
-const vertices = new Float32Array([
-    //   x,     y,     r,   g,   b
-    -0.9, -0.9,  1.0, 0.0, 0.0,  // 0: lewy-dolny (LB)
-    -0.9,  0.9,  0.0, 1.0, 0.0,  // 1: lewy-górny (LG)
-    0.9,  0.9,  0.0, 0.0, 1.0,  // 2: prawy-górny (PG)
-    0.9, -0.9,  1.0, 1.0, 0.0   // 3: prawy-dolny (PD)
-]);
+// Parametry "kanciastego koła"
+const cx = 0.0;
+const cy = 0.0;
+const radius = 0.9;
 
-// Indeksy (re-użycie wierzchołków)
-const indices = new Uint16Array([
-    0, 1, 2,   // trójkąt górny-lewy -> górny-prawy
-    0, 2, 3    // trójkąt dolny-lewy -> dolny-prawy
-]);
+// Uchwyt na bufor i liczba wierzchołków
+let vertexBuffer = null;
+let vertCount = 0;
 
-const indexBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+// Generator fan’a
+function generateCircleFan(segments) {
+    const count = 1 + segments + 1; // center + ring + closing
+    const data = new Float32Array(count * 5);
+    let o = 0;
 
-// BUFOR NA WIERZCHOŁKI 
-const vertexBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    // center (white)
+    data[o++] = cx;
+    data[o++] = cy;
+    data[o++] = 1.0;
+    data[o++] = 1.0;
+    data[o++] = 1.0;
 
-const aPosLoc = gl.getAttribLocation(program, 'a_pos');
+    for (let i = 0; i <= segments; i++) {
+        const t = (i / segments) * Math.PI * 2;
+        const x = cx + radius * Math.cos(t);
+        const y = cy + radius * Math.sin(t);
+
+        data[o++] = x;
+        data[o++] = y;
+
+        const r = 0.5 + 0.5 * Math.cos(t);
+        const g = 0.5 + 0.5 * Math.cos(t + 2.09439510239);
+        const b = 0.5 + 0.5 * Math.cos(t + 4.18879020479);
+        data[o++] = r;
+        data[o++] = g;
+        data[o++] = b;
+    }
+    return { data, count };
+}
+
+function uploadVertices(data) {
+    if (!vertexBuffer) vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+}
+
+// Slider refs
+const segInput = document.getElementById("seg");
+const segVal = document.getElementById("segVal");
+let segments = parseInt(segInput.value, 10);
+
+// Inicjalne dane
+{
+    const { data, count } = generateCircleFan(segments);
+    uploadVertices(data);
+    vertCount = count;
+}
+
+// Atrybuty
+const aPosLoc = gl.getAttribLocation(program, "a_pos");
 gl.enableVertexAttribArray(aPosLoc);
+const stride = 5 * 4;
+gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, stride, 0);
 
-const stride = 5 * 4; // 5 floatów * 4 bajty = 20 bajtów na wierzchołek
-gl.vertexAttribPointer(
-    aPosLoc,
-    2,            // a_pos: 2 liczby (x,y)
-    gl.FLOAT,
-    false,
-    stride,       // NOWE: odstęp między kolejnymi wierzchołkami
-    0             // offset pozycji = 0 bajtów od początku
-);
-
-const aColLoc = gl.getAttribLocation(program, 'a_col');
+const aColLoc = gl.getAttribLocation(program, "a_col");
 gl.enableVertexAttribArray(aColLoc);
-gl.vertexAttribPointer(
-    aColLoc,
-    3,            // a_col: 3 liczby (r,g,b)
-    gl.FLOAT,
-    false,
-    stride,       // ten sam stride: 20 bajtów na wierzchołek
-    2 * 4         // offset koloru = po 2 floatach pozycji = 8 bajtów
-);
+gl.vertexAttribPointer(aColLoc, 3, gl.FLOAT, false, stride, 2 * 4);
 
-
-gl.clearColor(0.07, 0.07, 0.07, 1); // background color
+// Rysowanie
+gl.clearColor(0.07, 0.07, 0.07, 1);
 
 function draw() {
-    //const rect = canvas.getBoundingClientRect();
     canvas.width = 700;
     canvas.height = 700;
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clear(gl.COLOR_BUFFER_BIT);    // paint the background
-    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, vertCount);
 }
 
-draw()
-/*window.addEventListener('resize', () => {
-    draw()
-});*/
+draw();
+
+// Reakcja na suwak
+segInput.addEventListener("input", () => {
+    segments = parseInt(segInput.value, 10);
+    segVal.textContent = segments;
+
+    const { data, count } = generateCircleFan(segments);
+    uploadVertices(data);
+    vertCount = count;
+
+    draw();
+});
