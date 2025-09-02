@@ -1,6 +1,5 @@
-// Get the DPR and size of the canvas
-
 import {generateCircleFan} from "./generateCircleFan.js";
+
 const canvas = document.getElementById("main");
 const gl = canvas.getContext('webgl');
 
