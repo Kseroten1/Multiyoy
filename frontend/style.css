@@ -1,5 +1,6 @@
-body {
-    margin: 0;
+html, body { 
+    height: 100%; 
+    margin: 0; 
 }
 
 #main {
@@ -8,4 +9,11 @@ body {
     background-color: #654321;
     display: grid;
     place-items: center;
+}
+
+.controls { 
+    position: fixed; 
+    top: 0.75rem; 
+    left: 0.75rem; 
+    color: white;
 }
