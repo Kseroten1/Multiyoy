@@ -50,9 +50,11 @@ const vertexBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 gl.enableVertexAttribArray(aPosLoc);
 
+export const ELEMENTS_PER_VERTEX = 2;
+
 gl.vertexAttribPointer(
     aPosLoc,
-    2,            // a_pos: 2 liczby (x,y)
+    ELEMENTS_PER_VERTEX,            // a_pos: 2 liczby (x,y)
     gl.FLOAT,
     false,
     0,          // zgodnie z dokumentacją ustawienie 0 pozwala na "ciasne upakowanie", nie trzeba ręcznie liczyć najmniejszej liczby
@@ -78,13 +80,13 @@ function draw() {
     gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform3fv(vColLoc, circleColor);
-    const vertexCount = positions.length / 2;
+    const vertexCount = positions.length / ELEMENTS_PER_VERTEX; //dzielimy przez liczbe elementów wierzchołka (w tym przypadku x,y czyli 2)
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
     
 }
 segSlider.addEventListener("input", () => {
     segments = Math.max(3, parseInt(segSlider.value, 10) || 3);
-    segLabel.textContent = String(segments);
+    segLabel.textContent = segments;
     draw();
 });
 

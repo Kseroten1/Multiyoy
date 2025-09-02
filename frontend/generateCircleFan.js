@@ -1,6 +1,7 @@
 export function generateCircleFan({ cx, cy, radius, segments }) {
+    import ELEMENTS_PER_VERTEX from './script.js';
     const count = 2 + segments; // center and closing + ring 
-    const data = new Float32Array(count * 2);
+    const data = new Float32Array(count * ELEMENTS_PER_VERTEX); // count is the number of points, we need to multiply in this case for x and y 
     
     let o = 0;
     
