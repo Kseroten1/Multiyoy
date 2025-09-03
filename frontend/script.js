@@ -35,12 +35,12 @@ void main() {
 
 function compileShader(type, source) {
     const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
+    gl.shaderSource(shader, source); // attach source code
+    gl.compileShader(shader); // compile it
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         const info = gl.getShaderInfoLog(shader);
         gl.deleteShader(shader);
-        throw new Error("Shader compile failed: " + info);
+        throw new Error('Shader compile failed: ' + info);
     }
     return shader;
 }
@@ -56,7 +56,7 @@ gl.linkProgram(program);
 if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     const info = gl.getProgramInfoLog(program);
     gl.deleteProgram(program);
-    throw new Error("Program link failed: " + info);
+    throw new Error('Program link failed: ' + info);
 }
 
 gl.useProgram(program);
