@@ -1,38 +1,11 @@
+import vertexShaderString from './vertexShader.glsl?raw'
+import fragmentShaderString from './fragmentShader.glsl?raw'
+
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2"); // ask for WebGL2 (newer GL). Required for gl_VertexID.
 
-const vertexShaderSource = `#version 300 es //specifies usage of WebGL2
-precision mediump float; 
-uniform vec2 u_center;    // circle center in clip space (-1..1)
-uniform float u_radius;   // circle radius in clip space
-uniform int u_segments;   // how many segments the circle uses
-
-void main() {
-  float twoPi = 6.28318530718; //since webgl doesnt have PI and using radians is unpredictable
-  int vid = gl_VertexID; // current vertex number: 0..u_segments+1
-  vec2 pos;
-  if (vid == 0) {
-    pos = u_center;
-  } else {
-    float t = float(vid - 1) / float(u_segments); // 0..1 around the circle
-    float angle = t * twoPi;              
-    vec2 dir = vec2(cos(angle), sin(angle));      // unit circle direction 
-    pos = u_center + dir * u_radius;           
-  }
-
-  gl_Position = vec4(pos, 0.0, 1.0); // final position
-}
-`;
-
-const fragmentShaderSource = `#version 300 es
-precision lowp float;
-out vec4 outColor; // explicit fragment output in WebGL2
-uniform vec3 v_col;
-
-void main() {
-  outColor = vec4(v_col, 1.0); // solid color, full alpha
-}
-`;
+const vertexShaderSource = vertexShaderString;
+const fragmentShaderSource = fragmentShaderString;
 
 function compileShader(type, source) {
     const shader = gl.createShader(type);
@@ -62,8 +35,8 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
 
 gl.useProgram(program);
 
-const vao = gl.createVertexArray(); // create a VAO
-gl.bindVertexArray(vao);            // bind it
+const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed 
+gl.bindVertexArray(vao);
 
 // Look up uniform locations we will set each frame
 const vColLoc = gl.getUniformLocation(program, "v_col");
@@ -78,7 +51,9 @@ const circleColor = [0.2, 0.5, 1.0]; // RGB
 const radius = 0.8;
 const center = [0.0, 0.0];
 
-gl.clearColor(0.07, 0.07, 0.07, 1);
+const backgroundColor = [0.07, 0.07, 0.07, 1]
+
+gl.clearColor(...backgroundColor);
 
 function draw() {
     canvas.width = 700;
@@ -94,7 +69,7 @@ function draw() {
     gl.uniform1f(uRadiusLoc, radius);    // set radius
     gl.uniform1i(uSegmentsLoc, segments); // set segments
 
-    const vertexCount = segments + 2; //N rim + 1 closing and rim center
+    const vertexCount = segments + 2; //N rim + 1 closing + rim center
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 }
 
