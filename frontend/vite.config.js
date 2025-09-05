@@ -4,6 +4,27 @@ import glsl from "vite-plugin-glsl";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { compression } from "vite-plugin-compression2";
 import { createHtmlPlugin } from "vite-plugin-html";
+import { minify } from 'shader-minifier-wasm';
+
+function parseMinifiedShader(minifiedJs) {
+    const renameMap = new Map();
+
+    // Capture rename mappings like: var var_FRAGCOLOR = "m"
+    const renameRegex = /var\s+var_([A-Z0-9_]+)\s*=\s*"([^"]+)"/g;
+    let match;
+    while ((match = renameRegex.exec(minifiedJs)) !== null) {
+        const original = match[1].toLowerCase(); // FRAGCOLOR → fragcolor
+        const renamed = match[2]; // "m"
+        renameMap.set(original, renamed);
+    }
+
+    // Capture the shader source (first backtick string)
+    const shaderRegex = /`([^`]*)`/;
+    const shaderMatch = shaderRegex.exec(minifiedJs);
+    const shaderSource = shaderMatch ? shaderMatch[1] : null;
+
+    return { shaderSource, renameMap };
+}
 
 function randomLetter() {
     const letters = "abcdefghijklmnopqrstuvwxyz";
@@ -87,6 +108,25 @@ function modifySingleHtmlPlugin() {
 
             await Bun.write(filePath, content);
             console.log(`✅ Modified single HTML file (HTML, JS, CSS): ${filePath}`);
+
+            const minified = await minify({
+                someShaderName: `
+                    #version 300 es
+precision lowp float;
+out vec4 outColor; // explicit fragment output in WebGL2
+uniform vec3 v_col;
+
+void main() {
+  outColor = vec4(v_col, 1.0); // solid color, full alpha
+}
+
+                  `
+            }, { format: 'js' });
+
+            const { shaderSource, renameMap } = parseMinifiedShader(minified);
+
+            console.log("Shader source:", shaderSource);
+            console.log("Rename map:", Object.fromEntries(renameMap));
         },
     };
 }
