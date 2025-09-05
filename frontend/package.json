@@ -9,6 +9,10 @@
     "preview": "bunx --bun vite preview"
   },
   "devDependencies": {
-    "vite": "^7.1.2"
+    "vite": "^7.1.2",
+    "vite-plugin-singlefile": "^2.3.0",
+    "vite-plugin-glsl": "^1.5.1",
+    "vite-plugin-compression2": "^2.2.1",
+    "vite-plugin-html": "^3.2.2"
   }
 }
