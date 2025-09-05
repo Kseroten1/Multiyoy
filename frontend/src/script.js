@@ -1,11 +1,8 @@
-import vertexShaderString from './vertexShader.glsl?raw'
-import fragmentShaderString from './fragmentShader.glsl?raw'
+import vertexShaderSource from './vertexShader.glsl'
+import fragmentShaderSource from './fragmentShader.glsl'
 
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2"); // ask for WebGL2 (newer GL). Required for gl_VertexID.
-
-const vertexShaderSource = vertexShaderString;
-const fragmentShaderSource = fragmentShaderString;
 
 function compileShader(type, source) {
     const shader = gl.createShader(type);
