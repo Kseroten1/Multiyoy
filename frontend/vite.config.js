@@ -4,7 +4,7 @@ import glsl from "vite-plugin-glsl";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { compression } from "vite-plugin-compression2";
 import { createHtmlPlugin } from "vite-plugin-html";
-import { minify } from 'shader-minifier-wasm';
+import { minify } from "shader-minifier-wasm";
 
 function parseMinifiedShader(minifiedJs) {
     const renameMap = new Map();
@@ -13,8 +13,8 @@ function parseMinifiedShader(minifiedJs) {
     const renameRegex = /var\s+var_([A-Z0-9_]+)\s*=\s*"([^"]+)"/g;
     let match;
     while ((match = renameRegex.exec(minifiedJs)) !== null) {
-        const original = match[1].toLowerCase(); // FRAGCOLOR → fragcolor
-        const renamed = match[2]; // "m"
+        const original = match[1].toLowerCase();
+        const renamed = match[2];
         renameMap.set(original, renamed);
     }
 
@@ -56,25 +56,21 @@ function modifySingleHtmlPlugin() {
             const filePath = path.join(outDir, "index.html");
             let content = await Bun.file(filePath).text();
 
-            // Replace IDs in HTML
+            // === HTML ID + class renaming ===
             content = content.replace(/\bid\s*=\s*["']([^"']+)["']/g, (match, p1) => {
                 const newId = getReplacement(idMap, p1);
                 return `id="${newId}"`;
             });
 
-            // Replace classes in HTML
-            content = content.replace(
-                /\bclass\s*=\s*["']([^"']+)["']/g,
-                (match, p1) => {
-                    const newClasses = p1
-                        .split(/\s+/)
-                        .map((cls) => getReplacement(classMap, cls))
-                        .join(" ");
-                    return `class="${newClasses}"`;
-                }
-            );
+            content = content.replace(/\bclass\s*=\s*["']([^"']+)["']/g, (match, p1) => {
+                const newClasses = p1
+                    .split(/\s+/)
+                    .map((cls) => getReplacement(classMap, cls))
+                    .join(" ");
+                return `class="${newClasses}"`;
+            });
 
-            // Replace getElementById in inline JS
+            // === JS getElementById replacement ===
             content = content.replace(
                 /getElementById\s*\(\s*["']([^"']+)["']\s*\)/g,
                 (match, p1) => {
@@ -83,57 +79,131 @@ function modifySingleHtmlPlugin() {
                 }
             );
 
-            // Replace selectors in <style> tags
-            content = content.replace(/<style[^>]*>([\s\S]*?)<\/style>/g, (match, css) => {
-                let newCss = css;
+            // === CSS selectors replacement ===
+            content = content.replace(
+                /<style[^>]*>([\s\S]*?)<\/style>/g,
+                (match, css) => {
+                    let newCss = css;
 
-                // Replace #id selectors
-                newCss = newCss.replace(/#([a-zA-Z0-9\-_]+)/g, (m, p1) => {
-                    if (idMap.has(p1)) {
-                        return `#${idMap.get(p1)}`;
-                    }
-                    return m;
-                });
+                    newCss = newCss.replace(/#([a-zA-Z0-9\-_]+)/g, (m, p1) => {
+                        if (idMap.has(p1)) {
+                            return `#${idMap.get(p1)}`;
+                        }
+                        return m;
+                    });
 
-                // Replace .class selectors
-                newCss = newCss.replace(/\.([a-zA-Z0-9\-_]+)/g, (m, p1) => {
-                    if (classMap.has(p1)) {
-                        return `.${classMap.get(p1)}`;
-                    }
-                    return m;
-                });
+                    newCss = newCss.replace(/\.([a-zA-Z0-9\-_]+)/g, (m, p1) => {
+                        if (classMap.has(p1)) {
+                            return `.${classMap.get(p1)}`;
+                        }
+                        return m;
+                    });
 
-                return `<style>${newCss}</style>`;
-            });
+                    return `<style>${newCss}</style>`;
+                }
+            );
+
+            // === GLSL shader minification inside <script> ===
+            content = await replaceInlineShaders(content);
 
             await Bun.write(filePath, content);
-            console.log(`✅ Modified single HTML file (HTML, JS, CSS): ${filePath}`);
-
-            const minified = await minify({
-                someShaderName: `
-                    #version 300 es
-precision lowp float;
-out vec4 outColor; // explicit fragment output in WebGL2
-uniform vec3 v_col;
-
-void main() {
-  outColor = vec4(v_col, 1.0); // solid color, full alpha
-}
-
-                  `
-            }, { format: 'js' });
-
-            const { shaderSource, renameMap } = parseMinifiedShader(minified);
-
-            console.log("Shader source:", shaderSource);
-            console.log("Rename map:", Object.fromEntries(renameMap));
+            console.log(`✅ Modified single HTML file (HTML, JS, CSS, GLSL): ${filePath}`);
         },
     };
 }
 
+// Async-safe replace for <script> blocks
+async function replaceInlineShaders(html) {
+    const scriptRegex = /(<script[^>]*>)([\s\S]*?)(<\/script>)/g;
+    let match;
+    let result = "";
+    let lastIndex = 0;
+
+    while ((match = scriptRegex.exec(html)) !== null) {
+        const [fullMatch, openTag, jsCode, closeTag] = match;
+
+        // Append everything before this <script>
+        result += html.slice(lastIndex, match.index);
+
+        // Process this <script>
+        const newJs = await processJsForShaders(jsCode);
+
+        // Preserve original <script ...> attributes
+        result += openTag + newJs + closeTag;
+        lastIndex = match.index + fullMatch.length;
+    }
+
+    // Append the rest of the HTML
+    result += html.slice(lastIndex);
+
+    return result;
+}
+
+async function processJsForShaders(jsCode) {
+    let newJs = jsCode;
+
+    // Find template literals that look like GLSL
+    const glslRegex = /`([^`]*?(?:gl_Position|precision)[^`]*)`/g;
+    let shaderMatch;
+    while ((shaderMatch = glslRegex.exec(jsCode)) !== null) {
+        const originalShader = shaderMatch[1];
+
+        // Run shader-minifier
+        const minified = await minify(
+            { shader: originalShader },
+            { format: "js" }
+        );
+
+        const { shaderSource, renameMap } = parseMinifiedShader(minified);
+
+        if (shaderSource) {
+            console.log("🔹 Minified inline shader:", shaderSource);
+            console.log("🔹 Rename map:", Object.fromEntries(renameMap));
+
+            // Replace original shader in JS code
+            newJs = newJs.replace(
+                "`" + originalShader + "`",
+                "`" + shaderSource + "`"
+            );
+
+            // === Adjust getUniformLocation calls ===
+            newJs = newJs.replace(
+                /getUniformLocation\s*\(\s*[^,]+,\s*["']([^"']+)["']\s*\)/g,
+                (m, uniformName) => {
+                    const key = uniformName.toLowerCase();
+                    if (renameMap.has(key)) {
+                        return m.replace(
+                            `"${uniformName}"`,
+                            `"${renameMap.get(key)}"`
+                        );
+                    }
+                    return m;
+                }
+            );
+
+            // === Adjust getAttribLocation calls ===
+            newJs = newJs.replace(
+                /getAttribLocation\s*\(\s*[^,]+,\s*["']([^"']+)["']\s*\)/g,
+                (m, attribName) => {
+                    const key = attribName.toLowerCase();
+                    if (renameMap.has(key)) {
+                        return m.replace(
+                            `"${attribName}"`,
+                            `"${renameMap.get(key)}"`
+                        );
+                    }
+                    return m;
+                }
+            );
+        }
+    }
+
+    return newJs;
+}
+
 export default defineConfig({
     plugins: [
-        glsl({ minify: true }), // still in use for shader imports, but no renaming
+        glsl({ minify: true }),
         viteSingleFile({ removeViteModuleLoader: true }),
         compression(),
         createHtmlPlugin({
