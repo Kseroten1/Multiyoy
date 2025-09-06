@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "bunx --bun vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "bunx vite build",
+    "preview": "bunx vite preview"
   },
   "devDependencies": {
-    "vite": "^7.1.2"
+    "vite": "^7.1.4"
   }
 }

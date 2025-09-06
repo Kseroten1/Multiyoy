@@ -5,3 +5,4 @@ riderModule.iml
 /_ReSharper.Caches/
 dist/
 node_modules
+bun.lock
