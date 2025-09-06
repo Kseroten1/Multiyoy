@@ -43,6 +43,18 @@ jobs:
       - name: run bun build
         run: |
           bunx --bun vite build --base=/Multiyoy/
+      - name: Show cwd and tree 
+        run: |
+          pwd
+          ls -la
+          echo "---- dist ----"
+          ls -la dist || true
+          echo "---- frontend/dist (from repo root) ----"
+          ls -la ../frontend/dist || true
+          echo "---- repo root ----"
+          cd ..
+          pwd
+          ls -la
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
