@@ -1,9 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-    <!-- Flat-top regular hexagon centered at (32,32) -->
+    <style>
+        :root {
+        --fill: #51C2B8;   /* blue/teal */
+        --stroke: #3C3C3C; /* dark grey outline on light UI */
+        }
+        @media (prefers-color-scheme: dark) {
+        :root {
+        --fill: #51C2B8;   /* blue/teal */
+        --stroke: #B5B5B5; /* light grey outline on dark UI */
+        }
+        }
+    </style>
     <polygon
             points="44,12 56,32 44,52 20,52 8,32 20,12"
-            fill="#51C2B8"
-            stroke="#000000"
+            fill="var(--fill)"
+            stroke="var(--stroke)"
             stroke-width="6"
             stroke-linejoin="round"
     />
