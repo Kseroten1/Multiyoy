@@ -39,10 +39,14 @@ const vao = gl.createVertexArray(); //GPU-state object that remembers how your v
 gl.bindVertexArray(vao);
 
 // Look up uniform locations we will set each frame
-const vColLoc = gl.getUniformLocation(program, "v_col");
 const uCenterLoc = gl.getUniformLocation(program, "u_center");
 const uRadiusLoc = gl.getUniformLocation(program, "u_radius");
 const uSegmentsLoc = gl.getUniformLocation(program, "u_segments");
+const uColorALoc = gl.getUniformLocation(program, 'u_colorA');
+const uColorBLoc = gl.getUniformLocation(program, 'u_colorB');
+
+const colorA = [1.0, 1.0, 1.0]; // polska
+const colorB = [0.9, 0.2, 0.2]; // gurom
 
 const segSlider = document.getElementById("seg");
 const segLabel = document.getElementById("segVal");
@@ -64,10 +68,11 @@ function draw() {
 
     gl.useProgram(program);
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)
-    gl.uniform3fv(vColLoc, circleColor); // set color
     gl.uniform2fv(uCenterLoc, center);   // set center
     gl.uniform1f(uRadiusLoc, radius);    // set radius
     gl.uniform1i(uSegmentsLoc, segments); // set segments
+    gl.uniform3fv(uColorALoc, colorA);
+    gl.uniform3fv(uColorBLoc, colorB);
 
     const vertexCount = segments + 2; //N rim + 1 closing + rim center
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
