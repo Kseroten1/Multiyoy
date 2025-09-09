@@ -35,37 +35,18 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
 
 gl.useProgram(program);
 
-function makeCircleFanVertices(segments) {
-    const twoPi = Math.PI * 2;
-    const verts = [];
-    // center at (0,0) for TRIANGLE_FAN start
-    verts.push(0, 0);
-    for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        const ang = t * twoPi;
-        verts.push(Math.cos(ang), Math.sin(ang)); // unit circle
-    }
-    return new Float32Array(verts);
-}
-
-const segments = 128;
-const circleVerts = makeCircleFanVertices(segments);
-
-const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed 
+const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed
 gl.bindVertexArray(vao);
-
+const onePoint = new Float32Array([0, 0]); 
 const posBuf = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-gl.bufferData(gl.ARRAY_BUFFER, circleVerts, gl.STATIC_DRAW);
-
-// location 0 must match layout(location = 0) in vertex shader
+gl.bufferData(gl.ARRAY_BUFFER, onePoint, gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0);
 gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 // Look up uniform locations we will set each frame
 const uMvpLoc = gl.getUniformLocation(program, "u_mvp"); // mat3
 const uCenterLoc = gl.getUniformLocation(program, "u_center");
-const uRadiusLoc = gl.getUniformLocation(program, "u_radius");
 const uColorALoc = gl.getUniformLocation(program, 'u_colorA');
 const uColorBLoc = gl.getUniformLocation(program, 'u_colorB');
 
@@ -73,71 +54,46 @@ const colorA = [1.0, 1.0, 1.0]; // polska
 const colorB = [0.9, 0.2, 0.2]; // gurom
 const backgroundColor = [0.07, 0.07, 0.07, 1]
 
-const radius = 0.8;
 const center = [0.0, 0.0];
+let scale = 1.0;
 let angle = 0.0;
 
-// ---- Minimal 2D mat3 utilities (column-major, GLSL-compatible) ----
-function mat3Identity() {
+// DOMMatrix -> mat3 column-major for GLSL
+function makeModelMat3(center, scale, angle) {
+    const dm = new DOMMatrix()
+        .scale(scale, scale)
+        .rotate((angle * 180) / Math.PI)
+        .translate(center[0], center[1]);
+
+    // DOMMatrix 2D affine: [ a c e; b d f; 0 0 1 ]
+    const a = dm.a,
+        b = dm.b,
+        c = dm.c,
+        d = dm.d,
+        e = dm.e,
+        f = dm.f;
+
     const m = new Float32Array(9);
-    m[0] = 1;
-    m[4] = 1;
+    m[0] = a;
+    m[1] = b;
+    m[2] = 0;
+
+    m[3] = c;
+    m[4] = d;
+    m[5] = 0;
+
+    m[6] = e;
+    m[7] = f;
     m[8] = 1;
     return m;
 }
-function mat3Mul(a, b) {
-    const r = new Float32Array(9);
-    // r = a * b (column-major)
-    r[0] = a[0] * b[0] + a[3] * b[1] + a[6] * b[2];
-    r[3] = a[0] * b[3] + a[3] * b[4] + a[6] * b[5];
-    r[6] = a[0] * b[6] + a[3] * b[7] + a[6] * b[8];
-
-    r[1] = a[1] * b[0] + a[4] * b[1] + a[7] * b[2];
-    r[4] = a[1] * b[3] + a[4] * b[4] + a[7] * b[5];
-    r[7] = a[1] * b[6] + a[4] * b[7] + a[7] * b[8];
-
-    r[2] = a[2] * b[0] + a[5] * b[1] + a[8] * b[2];
-    r[5] = a[2] * b[3] + a[5] * b[4] + a[8] * b[5];
-    r[8] = a[2] * b[6] + a[5] * b[7] + a[8] * b[8];
-    return r;
-}
-function mat3Translate(tx, ty) {
-    const m = mat3Identity();
-    m[6] = tx;
-    m[7] = ty;
-    return m;
-}
-function mat3Scale(sx, sy) {
-    const m = mat3Identity();
-    m[0] = sx;
-    m[4] = sy;
-    return m;
-}
-function mat3Rotate(theta) {
-    const c = Math.cos(theta);
-    const s = Math.sin(theta);
-    const m = mat3Identity();
-    m[0] = c;
-    m[3] = -s;
-    m[1] = s;
-    m[4] = c;
-    return m;
-}
-function makeModel(centerXY, r, angleRad = 0) {
-    const T = mat3Translate(centerXY[0], centerXY[1]);
-    const R = mat3Rotate(angleRad);
-    const S = mat3Scale(r, r);
-    // M = T * R * S
-    return mat3Mul(T, mat3Mul(R, S));
-}
 
 function updateUniforms() {
-    const M = makeModel(center, radius, angle);
+    const M = makeModelMat3(center, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, M);
     gl.uniform3fv(uColorALoc, colorA);
     gl.uniform3fv(uColorBLoc, colorB);
     gl.uniform2fv(uCenterLoc, center);
-    gl.uniform1f(uRadiusLoc, radius);
 }
 
 function draw() {
@@ -151,7 +107,7 @@ function draw() {
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)
     updateUniforms();
 
-    const vertexCount = segments + 2; //N rim + 1 closing + rim center
+    const vertexCount = 8; //N rim + 1 closing + rim center
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 }
 
