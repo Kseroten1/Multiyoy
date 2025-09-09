@@ -1,8 +1,9 @@
 #version 300 es //specifies usage of WebGL2
-precision mediump float; 
+precision highp float; 
 uniform vec2 u_center;    // circle center in clip space (-1..1)
 uniform float u_radius;   // circle radius in clip space
 uniform int u_segments;   // how many segments the circle uses
+out vec2 v_pos;   //pozycja 
 
 void main() {
   float twoPi = 6.28318530718; //since webgl doesnt have PI and using radians is unpredictable
@@ -17,5 +18,6 @@ void main() {
     pos = u_center + dir * u_radius;           
   }
 
+  v_pos  = pos;
   gl_Position = vec4(pos, 0.0, 1.0); // final position
 }
