@@ -54,16 +54,18 @@ const colorA = [1.0, 1.0, 1.0]; // polska
 const colorB = [0.9, 0.2, 0.2]; // gurom
 const backgroundColor = [0.07, 0.07, 0.07, 1]
 
-const center = [0.0, 0.0];
+let center = [0.0, 0.0];
 let scale = 1.0;
 let angle = 0.0;
 
 // DOMMatrix -> mat3 column-major for GLSL
 function makeModelMat3(center, scale, angle) {
+    const aspect = canvas.width / canvas.height; // w pikselach
     const dm = new DOMMatrix()
-        .scale(scale, scale)
+        .scale(1 / aspect, 1)
+        .translate(center[0], center[1])
         .rotate((angle * 180) / Math.PI)
-        .translate(center[0], center[1]);
+        .scale(scale, scale);
 
     // DOMMatrix 2D affine: [ a c e; b d f; 0 0 1 ]
     const a = dm.a,
@@ -97,8 +99,8 @@ function updateUniforms() {
 }
 
 function draw() {
-    canvas.width = 700;
-    canvas.height = 700;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(...backgroundColor);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -112,3 +114,63 @@ function draw() {
 }
 
 draw(); // initial draw
+
+let dragging = false; //needed for logic of 'dragging' the hexagon
+let lastX = 0.0; 
+let lastY = 0.0;
+
+// converting canvas pixel position of mouse to webgl clip range (-1:1) 
+function pxToClip(pixelX, pixelY) {
+    const clipX = (pixelX / canvas.width) * 2.0;
+    const clipY = -((pixelY / canvas.height) * 2.0); //negation because the pixel Y grows the "lower" the mouse is on the screen and clip Y grows the "higher" the mouse is
+    return {x: clipX,y: clipY };
+}
+
+canvas.addEventListener("mousedown", mouseDown);
+canvas.addEventListener("mouseup", mouseUp);
+canvas.addEventListener("mousemove", mouseMove);
+canvas.addEventListener("wheel", wheelMove)
+
+function mouseDown(e) {
+    dragging = true; // if mouse pressed user is 'dragging'
+    lastX = e.clientX; 
+    lastY = e.clientY;
+}
+
+function mouseUp(e) {
+    dragging = false; // if mouse is released user is not 'dragging'
+}
+
+function mouseMove(e) {
+    if (!dragging) return; // if mouse 'released' or 'not clicked' we are not interested in its movement
+    let mouseDeltaX = e.clientX - lastX;
+    let mouseDeltaY = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    let clipDelta = pxToClip(mouseDeltaX, mouseDeltaY);
+    center[0] += clipDelta.x;
+    center[1] += clipDelta.y;
+    draw()
+}
+
+function wheelMove(e) {
+    e.preventDefault();
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const mouseClipXY = pxToClip(mouseX, mouseY);
+    const mouseClipX = mouseClipXY.x - 1;  //we need to substract here and add in the y to convert from delta to absolute position
+    const mouseClipY = mouseClipXY.y + 1;
+
+    const zoom = Math.exp(-e.deltaY * 0.001);
+    const newScale = Math.max(0.05, Math.min(8.0, scale * zoom));
+
+    const k = newScale / scale;
+    center[0] = mouseClipX + (center[0] - mouseClipX) * k;
+    center[1] = mouseClipY + (center[1] - mouseClipY) * k;
+
+    scale = newScale;
+    draw();
+}
