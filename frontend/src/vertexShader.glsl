@@ -1,23 +1,27 @@
 #version 300 es //specifies usage of WebGL2
 precision highp float; 
-uniform vec2 u_center;    // circle center in clip space (-1..1)
-uniform float u_radius;   // circle radius in clip space
-uniform int u_segments;   // how many segments the circle uses
-out vec2 v_pos;   //pozycja 
+
+const vec2 HEX_OFFSETS[8] = vec2[](
+    // center
+    vec2(0.0, 0.0),
+    // 6 corners counter-clockwise starting at angle = 0
+    vec2( 1.0, 0.0),        // 0 deg
+    vec2( 0.5, 0.8660254),  // 60 deg  (sqrt(3)/2)
+    vec2(-0.5, 0.8660254),  // 120 deg
+    vec2(-1.0, 0.0),        // 180 deg
+    vec2(-0.5, -0.8660254),  // 240 deg
+    vec2( 0.5, -0.8660254),  // 300 deg
+    //first vertex again to create last triangle
+    vec2(1.0, 0.0)
+);
+
+uniform mat3 u_mvp;
+uniform vec2  u_center;
+out vec2 v_pos;
 
 void main() {
-  float twoPi = 6.28318530718; //since webgl doesnt have PI and using radians is unpredictable
-  int vid = gl_VertexID; // current vertex number: 0..u_segments+1
-  vec2 pos;
-  if (vid == 0) {
-    pos = u_center;
-  } else {
-    float t = float(vid - 1) / float(u_segments); // 0..1 around the circle
-    float angle = t * twoPi;              
-    vec2 dir = vec2(cos(angle), sin(angle));      // unit circle direction 
-    pos = u_center + dir * u_radius;           
-  }
-
-  v_pos  = pos;
-  gl_Position = vec4(pos, 0.0, 1.0); // final position
+    vec2 localPos = HEX_OFFSETS[gl_VertexID];
+    vec3 clipPos = u_mvp * vec3(localPos, 1.0);
+    v_pos = clipPos.xy;
+    gl_Position = vec4(clipPos.xy, 0.0, 1.0);
 }

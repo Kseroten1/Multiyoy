@@ -35,54 +35,80 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
 
 gl.useProgram(program);
 
-const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed 
+const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed
 gl.bindVertexArray(vao);
+const onePoint = new Float32Array([0, 0]); 
+const posBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+gl.bufferData(gl.ARRAY_BUFFER, onePoint, gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 // Look up uniform locations we will set each frame
+const uMvpLoc = gl.getUniformLocation(program, "u_mvp"); // mat3
 const uCenterLoc = gl.getUniformLocation(program, "u_center");
-const uRadiusLoc = gl.getUniformLocation(program, "u_radius");
-const uSegmentsLoc = gl.getUniformLocation(program, "u_segments");
 const uColorALoc = gl.getUniformLocation(program, 'u_colorA');
 const uColorBLoc = gl.getUniformLocation(program, 'u_colorB');
 
 const colorA = [1.0, 1.0, 1.0]; // polska
 const colorB = [0.9, 0.2, 0.2]; // gurom
-
-const segSlider = document.getElementById("seg");
-const segLabel = document.getElementById("segVal");
-let segments = Math.max(3, parseInt(segSlider.value, 10) || 3);
-const circleColor = [0.2, 0.5, 1.0]; // RGB
-const radius = 0.8;
-const center = [0.0, 0.0];
-
 const backgroundColor = [0.07, 0.07, 0.07, 1]
 
-gl.clearColor(...backgroundColor);
+const center = [0.0, 0.0];
+let scale = 1.0;
+let angle = 0.0;
+
+// DOMMatrix -> mat3 column-major for GLSL
+function makeModelMat3(center, scale, angle) {
+    const dm = new DOMMatrix()
+        .scale(scale, scale)
+        .rotate((angle * 180) / Math.PI)
+        .translate(center[0], center[1]);
+
+    // DOMMatrix 2D affine: [ a c e; b d f; 0 0 1 ]
+    const a = dm.a,
+        b = dm.b,
+        c = dm.c,
+        d = dm.d,
+        e = dm.e,
+        f = dm.f;
+
+    const m = new Float32Array(9);
+    m[0] = a;
+    m[1] = b;
+    m[2] = 0;
+
+    m[3] = c;
+    m[4] = d;
+    m[5] = 0;
+
+    m[6] = e;
+    m[7] = f;
+    m[8] = 1;
+    return m;
+}
+
+function updateUniforms() {
+    const M = makeModelMat3(center, scale, angle);
+    gl.uniformMatrix3fv(uMvpLoc, false, M);
+    gl.uniform3fv(uColorALoc, colorA);
+    gl.uniform3fv(uColorBLoc, colorB);
+    gl.uniform2fv(uCenterLoc, center);
+}
 
 function draw() {
     canvas.width = 700;
     canvas.height = 700;
     gl.viewport(0, 0, canvas.width, canvas.height);
-
+    gl.clearColor(...backgroundColor);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(program);
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)
-    gl.uniform2fv(uCenterLoc, center);   // set center
-    gl.uniform1f(uRadiusLoc, radius);    // set radius
-    gl.uniform1i(uSegmentsLoc, segments); // set segments
-    gl.uniform3fv(uColorALoc, colorA);
-    gl.uniform3fv(uColorBLoc, colorB);
+    updateUniforms();
 
-    const vertexCount = segments + 2; //N rim + 1 closing + rim center
+    const vertexCount = 8; //N rim + 1 closing + rim center
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 }
-
-// Update on slider change
-segSlider.addEventListener("input", () => {
-    segments = Math.max(3, parseInt(segSlider.value, 10) || 3);
-    segLabel.textContent = segments;
-    draw();
-});
 
 draw(); // initial draw
