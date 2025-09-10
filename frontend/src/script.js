@@ -6,7 +6,7 @@ const gl = canvas.getContext("webgl2"); // ask for WebGL2 (newer GL). Required f
 
 const vertexShaderSource = vertexShaderString;
 const fragmentShaderSource = fragmentShaderString;
-const rect = canvas.getBoundingClientRect();
+let rect = canvas.getBoundingClientRect();
 
 function compileShader(type, source) {
     const shader = gl.createShader(type);
@@ -92,6 +92,7 @@ function updateUniforms() {
 }
 
 function draw() {
+    rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
