@@ -38,7 +38,7 @@ gl.useProgram(program);
 
 const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed
 gl.bindVertexArray(vao);
-const onePoint = new Float32Array([0, 0]); 
+const onePoint = new Float32Array([0, 0]);
 const posBuf = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
 gl.bufferData(gl.ARRAY_BUFFER, onePoint, gl.STATIC_DRAW);
@@ -67,7 +67,7 @@ function makeModelMat3(center, scale, angle) {
         .translate(center[0], center[1])
         .rotate((angle * 180) / Math.PI)
         .scale(scale, scale);
-    
+
     const m = new Float32Array(9);
     m[0] = dm.a;
     m[1] = dm.b;
@@ -109,7 +109,7 @@ function draw() {
 draw(); // initial draw
 
 let dragging = false; //needed for logic of 'dragging' the hexagon
-let lastX = 0.0; 
+let lastX = 0.0;
 let lastY = 0.0;
 
 // converting canvas pixel position of mouse to webgl clip range (-1:1) 
@@ -126,7 +126,7 @@ canvas.addEventListener("wheel", wheelMove)
 
 function mouseDown(e) {
     dragging = true; // if mouse pressed user is 'dragging'
-    lastX = e.clientX; 
+    lastX = e.clientX;
     lastY = e.clientY;
 }
 
@@ -152,7 +152,7 @@ function wheelMove(e) {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    
+
     const mouseClipXY = pxToClip(mouseX, mouseY);
     const mouseClipX = mouseClipXY.x - 1;  //we need to substract here and add in the y to convert from delta to absolute position
     const mouseClipY = mouseClipXY.y + 1;
