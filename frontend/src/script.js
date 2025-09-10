@@ -115,9 +115,9 @@ let lastY = 0.0;
 let activePointerId = -1;
 
 // converting canvas pixel position of mouse to webgl clip range (-1:1) 
-function pxToClip(pixelX, pixelY) {
-    const clipX = (pixelX / rect.width) * 2.0;
-    const clipY = -((pixelY / rect.height) * 2.0); //negation because the pixel Y grows the "lower" the mouse is on the screen and clip Y grows the "higher" the mouse is
+function pxPosToClip(pixelX, pixelY) {
+    const clipX = (pixelX / rect.width) * 2.0 - 1;
+    const clipY = -((pixelY / rect.height) * 2.0 - 1); //negation because the pixel Y grows the "lower" the mouse is on the screen and clip Y grows the "higher" the mouse is
     return {x: clipX,y: clipY };
 }
 
@@ -137,7 +137,7 @@ function endPointer(e) {
 }
 
 function onPointerDown(e) {
-    if (dragging) return; // tylko jeden pointer na raz
+    if (dragging) return;
     e.preventDefault();
 
     activePointerId = e.pointerId;
@@ -166,36 +166,14 @@ function onPointerMove(e) {
     draw();
 }
 
-function mouseDown(e) {
-    dragging = true; // if mouse pressed user is 'dragging'
-    lastX = e.clientX;
-    lastY = e.clientY;
-}
-
-function mouseUp(e) {
-    dragging = false; // if mouse is released user is not 'dragging'
-}
-
-function mouseMove(e) {
-    if (!dragging) return; // if mouse 'released' or 'not clicked' we are not interested in its movement
-    let mouseDeltaX = e.clientX - lastX;
-    let mouseDeltaY = e.clientY - lastY;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    let clipDelta = pxToClip(mouseDeltaX, mouseDeltaY);
-    center[0] += clipDelta.x;
-    center[1] += clipDelta.y;
-    draw()
-}
-
 function wheelMove(e) {
     e.preventDefault();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const mouseClipXY = pxToClip(mouseX, mouseY);
-    const mouseClipX = mouseClipXY.x - 1;  //we need to substract here and add in the y to convert from delta to absolute position
-    const mouseClipY = mouseClipXY.y + 1;
+    const mouseClipXY = pxPosToClip(mouseX, mouseY);
+    const mouseClipX = mouseClipXY.x;  //we need to substract here and add in the y to convert from delta to absolute position
+    const mouseClipY = mouseClipXY.y;
 
     const zoom = Math.exp(-e.deltaY * 0.001);
     const newScale = Math.max(0.05, Math.min(8.0, scale * zoom));
