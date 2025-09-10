@@ -6,6 +6,7 @@ const gl = canvas.getContext("webgl2"); // ask for WebGL2 (newer GL). Required f
 
 const vertexShaderSource = vertexShaderString;
 const fragmentShaderSource = fragmentShaderString;
+const rect = canvas.getBoundingClientRect();
 
 function compileShader(type, source) {
     const shader = gl.createShader(type);
@@ -66,26 +67,18 @@ function makeModelMat3(center, scale, angle) {
         .translate(center[0], center[1])
         .rotate((angle * 180) / Math.PI)
         .scale(scale, scale);
-
-    // DOMMatrix 2D affine: [ a c e; b d f; 0 0 1 ]
-    const a = dm.a,
-        b = dm.b,
-        c = dm.c,
-        d = dm.d,
-        e = dm.e,
-        f = dm.f;
-
+    
     const m = new Float32Array(9);
-    m[0] = a;
-    m[1] = b;
+    m[0] = dm.a;
+    m[1] = dm.b;
     m[2] = 0;
 
-    m[3] = c;
-    m[4] = d;
+    m[3] = dm.c;
+    m[4] = dm.d;
     m[5] = 0;
 
-    m[6] = e;
-    m[7] = f;
+    m[6] = dm.e;
+    m[7] = dm.f;
     m[8] = 1;
     return m;
 }
@@ -99,8 +92,8 @@ function updateUniforms() {
 }
 
 function draw() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.width = rect.width * window.devicePixelRatio;
+    canvas.height = rect.height * window.devicePixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(...backgroundColor);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -121,8 +114,8 @@ let lastY = 0.0;
 
 // converting canvas pixel position of mouse to webgl clip range (-1:1) 
 function pxToClip(pixelX, pixelY) {
-    const clipX = (pixelX / canvas.width) * 2.0;
-    const clipY = -((pixelY / canvas.height) * 2.0); //negation because the pixel Y grows the "lower" the mouse is on the screen and clip Y grows the "higher" the mouse is
+    const clipX = (pixelX / rect.width) * 2.0;
+    const clipY = -((pixelY / rect.height) * 2.0); //negation because the pixel Y grows the "lower" the mouse is on the screen and clip Y grows the "higher" the mouse is
     return {x: clipX,y: clipY };
 }
 
