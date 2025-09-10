@@ -16,7 +16,6 @@ const vec2 HEX_OFFSETS[8] = vec2[](
 );
 
 uniform mat3 u_mvp;
-uniform vec2  u_center;
 out vec2 v_pos;
 
 void main() {
