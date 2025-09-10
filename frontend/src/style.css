@@ -2,27 +2,14 @@
     color-scheme: dark;
 }
 
-html, body { 
-    height: 100%; 
-    margin: 0; 
+html, body {
+    height: 100%;
+    margin: 0;
 }
 
 #main {
-    /*height: 100dvh;
-    width: 100dvw;*/
+    height: 100dvh;
+    width: 100%;
     background-color: #654321;
-    display: grid;
-    place-items: center;
-}
-
-#segVal {
-    display: inline-block;
-    inline-size: 2rem;
-}
-
-.controls { 
-    position: fixed; 
-    top: 0.75rem; 
-    left: 0.75rem; 
-
+    display: block;
 }
