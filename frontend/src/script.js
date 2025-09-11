@@ -59,16 +59,20 @@ const centers = [
     [-0.8660254, 0.0],
     [ 0.8660254, 0.0],
 ];
+let panOffset = { x: 0.0, y: 0.0 };
 let scale = 1.0;
 let angle = 0.0;
 
 // DOMMatrix -> mat3 column-major for GLSL
-function makeModelMat3(scale, angle) {
+function makeModelMat3(pan, scale, angle) {
     const aspect = canvas.width / canvas.height; // w pikselach
     const dm = new DOMMatrix()
-        .scale(1 , aspect)
+        .scale(1, aspect)
+        .scale(scale, scale)
         .rotate((angle * 180) / Math.PI)
-        .scale(scale, scale);
+        .translate(pan.x, pan.y);
+        
+        
 
     const m = new Float32Array(9);
     m[0] = dm.a;
@@ -86,14 +90,13 @@ function makeModelMat3(scale, angle) {
 }
 
 function updateUniforms() {
-    const M = makeModelMat3(scale, angle);
+    const M = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, M);
     gl.uniform3fv(uColorALoc, colorA);
     gl.uniform3fv(uColorBLoc, colorB);
 }
 
 function draw() {
-    
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -165,31 +168,18 @@ function onPointerMove(e) {
 
     const clipDeltaX = (mouseDeltaX / rect.width) * 2.0;
     const clipDeltaY = -((mouseDeltay / rect.height) * 2.0);
-    for (let i = 0 ; i < centers.length; i++) {
-        centers[i][0] += clipDeltaX;
-        centers[i][1] += clipDeltaY;
-    }
+    
+    panOffset.x += clipDeltaX;
+    panOffset.y += clipDeltaY;
 
     draw();
 }
 
 function wheelMove(e) {
     e.preventDefault();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const mouseClipXY = pxPosToClip(mouseX, mouseY);
-    const mouseClipX = mouseClipXY.x; 
-    const mouseClipY = mouseClipXY.y;
-
+    
     const zoom = Math.exp(-e.deltaY * 0.001);
     const newScale = Math.max(0.05, Math.min(8.0, scale * zoom));
-
-    const k = newScale / scale;
-    for (let i = 0; i < centers.length; i++) {
-        centers[i][0] = mouseClipX + (centers[i][0] - mouseClipX) * k;
-        centers[i][1] = mouseClipY + (centers[i][1] - mouseClipY) * k;
-    }
 
     scale = newScale;
     draw();
