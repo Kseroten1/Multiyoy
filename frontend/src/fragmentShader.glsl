@@ -3,7 +3,6 @@ precision highp float;
 
 uniform vec3  u_colorA;  // top color
 uniform vec3  u_colorB;  // bottom color
-uniform vec2  u_center;
 in vec2 v_pos;
 in float v_localY;
 out vec4 outColor;
