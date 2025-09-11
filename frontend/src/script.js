@@ -55,18 +55,24 @@ const colorA = [1.0, 1.0, 1.0]; // polska
 const colorB = [0.9, 0.2, 0.2]; // gurom
 const backgroundColor = [0.07, 0.07, 0.07, 1]
 
-let center = [0.0, 0.0];
+const centers = [
+    [-0.8660254, 0.0],
+    [ 0.8660254, 0.0],
+];
+let panOffset = { x: 0.0, y: 0.0 };
 let scale = 1.0;
 let angle = 0.0;
 
 // DOMMatrix -> mat3 column-major for GLSL
-function makeModelMat3(center, scale, angle) {
+function makeModelMat3(pan, scale, angle) {
     const aspect = canvas.width / canvas.height; // w pikselach
     const dm = new DOMMatrix()
-        .scale(1 / aspect, 1)
-        .translate(center[0], center[1])
+        .scale(1, aspect)
+        .scale(scale, scale)
         .rotate((angle * 180) / Math.PI)
-        .scale(scale, scale);
+        .translate(pan.x, pan.y);
+        
+        
 
     const m = new Float32Array(9);
     m[0] = dm.a;
@@ -84,15 +90,13 @@ function makeModelMat3(center, scale, angle) {
 }
 
 function updateUniforms() {
-    const M = makeModelMat3(center, scale, angle);
+    const M = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, M);
     gl.uniform3fv(uColorALoc, colorA);
     gl.uniform3fv(uColorBLoc, colorB);
-    gl.uniform2fv(uCenterLoc, center);
 }
 
 function draw() {
-    
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -104,7 +108,10 @@ function draw() {
     updateUniforms();
 
     const vertexCount = 8; //N rim + 1 closing + rim center
-    gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
+    for (let i = 0; i < centers.length; i++) {
+        gl.uniform2fv(uCenterLoc, new Float32Array(centers[i]));
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 8);
+    }
 }
 
 draw(); // initial draw
@@ -159,28 +166,20 @@ function onPointerMove(e) {
     lastX = e.clientX;
     lastY = e.clientY;
 
-    var r = canvas.getBoundingClientRect();
-    center[0] += (dx / r.width) * 2.0;
-    center[1] += -((dy / r.height) * 2.0);
+    const clipDeltaX = (dx / rect.width) * 2.0;
+    const clipDeltaY = -((dy / rect.height) * 2.0);
+    
+    panOffset.x += clipDeltaX;
+    panOffset.y += clipDeltaY;
 
     draw();
 }
 
 function wheelMove(e) {
     e.preventDefault();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const mouseClipXY = pxPosToClip(mouseX, mouseY);
-    const mouseClipX = mouseClipXY.x;  //we need to substract here and add in the y to convert from delta to absolute position
-    const mouseClipY = mouseClipXY.y;
-
+    
     const zoom = Math.exp(-e.deltaY * 0.001);
     const newScale = Math.max(0.05, Math.min(8.0, scale * zoom));
-
-    const k = newScale / scale;
-    center[0] = mouseClipX + (center[0] - mouseClipX) * k;
-    center[1] = mouseClipY + (center[1] - mouseClipY) * k;
 
     scale = newScale;
     draw();
