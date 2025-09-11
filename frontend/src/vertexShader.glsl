@@ -20,11 +20,11 @@ const vec2 HEX_OFFSETS[8] = vec2[](
 uniform mat3 u_mvp;
 uniform vec2 u_center;
 out vec2 v_pos;
-out float v_localY;
+out vec2 v_local;
 
 void main() {
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
-    v_localY = localPos.y;
+    v_local = localPos;
     vec2 pos = u_center + localPos;
     vec3 clipPos = u_mvp * vec3(pos, 1.0);
     v_pos = clipPos.xy;
