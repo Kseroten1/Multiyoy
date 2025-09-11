@@ -161,13 +161,13 @@ function onPointerMove(e) {
 
     e.preventDefault();
 
-    var mouseDeltaX = e.clientX - lastX;
-    var mouseDeltay = e.clientY - lastY;
+    var dx = e.clientX - lastX;
+    var dy = e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
 
-    const clipDeltaX = (mouseDeltaX / rect.width) * 2.0;
-    const clipDeltaY = -((mouseDeltay / rect.height) * 2.0);
+    const clipDeltaX = (dx / rect.width) * 2.0;
+    const clipDeltaY = -((dy / rect.height) * 2.0);
     
     panOffset.x += clipDeltaX;
     panOffset.y += clipDeltaY;
