@@ -9,7 +9,7 @@ flat in int v_edgeId;
 out vec4 outColor;
 
 // source : https://iquilezles.org/articles/distfunctions2d/
-// squared signed distance to a hexagon (no sqrt at all)
+// squared distance to a hexagon (unsigned, no sqrt)
 float sdHexSq(vec2 p) {
     const float s = 1.0 / 0.8660254037844386; // = 1 / cos(30°)
     p *= s;
@@ -20,9 +20,8 @@ float sdHexSq(vec2 p) {
     p -= 2.0 * min(h, 0.0) * k.xy;
     p -= vec2(clamp(p.x, -k.z, k.z), 1.0);
 
-    // squared distance, no sqrt used
-    float dSq = dot(p, p) * sign(p.y);
-    return dSq / (s * s); // keep scale consistent
+    // pure squared distance, no sign
+    return dot(p, p) / (s * s);
 }
 
 // kolor krawędzi wg id 1..6
@@ -42,14 +41,14 @@ void main() {
     // prosta grubość ramki (jednostki heksa)
     const float borderWidth = 0.06;
 
-    // adjust comparison for squared distance
-    bool onBorder = abs(dSq) <= borderWidth * borderWidth;
+    // compare squared values
+    bool onBorder = dSq <= borderWidth * borderWidth;
 
-    // gradient fill
+    // fill color
     vec3 fillRGB = (v_local.y >= 0.0) ? u_colorA : u_colorB;
     vec3 rgb = fillRGB;
 
-    // border color override
+    // border overrides
     if (onBorder) {
         rgb = edgeColor(v_edgeId);
     }
