@@ -8,9 +8,10 @@ in vec2 v_local;
 flat in int v_edgeId;
 out vec4 outColor;
 
-//source : https://iquilezles.org/articles/distfunctions2d/
-float sdHex(vec2 p) {
-    const float s = 1.0 / 0.8660254037844386;
+// source : https://iquilezles.org/articles/distfunctions2d/
+// squared signed distance to a hexagon (no sqrt at all)
+float sdHexSq(vec2 p) {
+    const float s = 1.0 / 0.8660254037844386; // = 1 / cos(30°)
     p *= s;
     p = vec2(-p.y, p.x);
     const vec3 k = vec3(-0.8660254, 0.5, 0.577350269);
@@ -18,8 +19,10 @@ float sdHex(vec2 p) {
     float h = dot(k.xy, p);
     p -= 2.0 * min(h, 0.0) * k.xy;
     p -= vec2(clamp(p.x, -k.z, k.z), 1.0);
-    float d = length(p) * sign(p.y);
-    return d / s;
+
+    // squared distance, no sqrt used
+    float dSq = dot(p, p) * sign(p.y);
+    return dSq / (s * s); // keep scale consistent
 }
 
 // kolor krawędzi wg id 1..6
@@ -30,20 +33,23 @@ vec3 edgeColor(int id) {
     if (id == 3) return vec3(0.0, 1.0, 0.0); // zielony
     if (id == 4) return vec3(0.0, 0.5, 1.0); // niebieski
     if (id == 5) return vec3(0.6, 0.0, 1.0); // fioletowy
+    return vec3(1.0); // fallback (white)
 }
 
 void main() {
-    float d = sdHex(v_local);
+    float dSq = sdHexSq(v_local);
 
     // prosta grubość ramki (jednostki heksa)
     const float borderWidth = 0.06;
 
-    // jeżeli w pasie [0, borderWidth] => zielona ramka
-    bool onBorder = abs(d) <= borderWidth && v_edgeId != 2;
+    // adjust comparison for squared distance
+    bool onBorder = abs(dSq) <= borderWidth * borderWidth;
 
+    // gradient fill
     vec3 fillRGB = (v_local.y >= 0.0) ? u_colorA : u_colorB;
-	vec3 rgb = fillRGB;
-    
+    vec3 rgb = fillRGB;
+
+    // border color override
     if (onBorder) {
         rgb = edgeColor(v_edgeId);
     }
