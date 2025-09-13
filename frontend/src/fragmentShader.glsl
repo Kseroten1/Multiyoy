@@ -7,6 +7,7 @@ uniform vec3  u_colorB;  // bottom color
 in vec2 v_local;
 out vec4 outColor;
 
+//source : https://iquilezles.org/articles/distfunctions2d/
 float sdHex(vec2 p) {
     const float s = 1.0 / 0.8660254037844386;
     p *= s;
