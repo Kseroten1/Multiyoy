@@ -5,6 +5,7 @@ uniform vec3  u_colorA;  // top color
 uniform vec3  u_colorB;  // bottom color
 
 in vec2 v_local;
+flat in int v_edgeId;
 out vec4 outColor;
 
 //source : https://iquilezles.org/articles/distfunctions2d/
@@ -21,6 +22,16 @@ float sdHex(vec2 p) {
     return d / s;
 }
 
+// kolor krawędzi wg id 1..6
+vec3 edgeColor(int id) {
+    if (id == 1) return vec3(1.0, 0.0, 0.0); // czerwony
+    if (id == 2) return vec3(1.0, 0.5, 0.0); // pomarańczowy
+    if (id == 3) return vec3(1.0, 1.0, 0.0); // żółty
+    if (id == 4) return vec3(0.0, 1.0, 0.0); // zielony
+    if (id == 5) return vec3(0.0, 0.5, 1.0); // niebieski
+    if (id == 6) return vec3(0.6, 0.0, 1.0); // fioletowy
+}
+
 void main() {
     float d = sdHex(v_local);
 
@@ -31,7 +42,10 @@ void main() {
     bool onBorder = abs(d) <= borderWidth;
 
     vec3 fillRGB = (v_local.y >= 0.0) ? u_colorA : u_colorB;
-    vec3 rgb = onBorder ? vec3(0.3, 1.0, 0.8) : fillRGB;
+	vec3 rgb = fillRGB;
+    if (onBorder && v_edgeId > 0) {
+        rgb = edgeColor(v_edgeId);
+    }
 
     outColor = vec4(rgb, 1.0);
 }
