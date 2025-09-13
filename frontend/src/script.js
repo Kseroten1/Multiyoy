@@ -60,7 +60,7 @@ const centers = [
     [ 0.8660254, 0.0],
 ];
 let panOffset = { x: 0.0, y: 0.0 };
-let scale = 0.2;
+let scale = 1.5;
 let angle = 0.0;
 
 // DOMMatrix -> mat3 column-major for GLSL

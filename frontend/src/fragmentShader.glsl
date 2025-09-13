@@ -24,12 +24,12 @@ float sdHex(vec2 p) {
 
 // kolor krawędzi wg id 1..6
 vec3 edgeColor(int id) {
-    if (id == 1) return vec3(1.0, 0.0, 0.0); // czerwony
-    if (id == 2) return vec3(1.0, 0.5, 0.0); // pomarańczowy
-    if (id == 3) return vec3(1.0, 1.0, 0.0); // żółty
-    if (id == 4) return vec3(0.0, 1.0, 0.0); // zielony
-    if (id == 5) return vec3(0.0, 0.5, 1.0); // niebieski
-    if (id == 6) return vec3(0.6, 0.0, 1.0); // fioletowy
+    if (id == 0) return vec3(1.0, 0.0, 0.0); // czerwony
+    if (id == 1) return vec3(1.0, 0.5, 0.0); // pomarańczowy
+    if (id == 2) return vec3(1.0, 1.0, 0.0); // żółty
+    if (id == 3) return vec3(0.0, 1.0, 0.0); // zielony
+    if (id == 4) return vec3(0.0, 0.5, 1.0); // niebieski
+    if (id == 5) return vec3(0.6, 0.0, 1.0); // fioletowy
 }
 
 void main() {
@@ -39,11 +39,12 @@ void main() {
     const float borderWidth = 0.06;
 
     // jeżeli w pasie [0, borderWidth] => zielona ramka
-    bool onBorder = abs(d) <= borderWidth;
+    bool onBorder = abs(d) <= borderWidth && v_edgeId != 2;
 
     vec3 fillRGB = (v_local.y >= 0.0) ? u_colorA : u_colorB;
 	vec3 rgb = fillRGB;
-    if (onBorder && v_edgeId > 0) {
+    
+    if (onBorder) {
         rgb = edgeColor(v_edgeId);
     }
 

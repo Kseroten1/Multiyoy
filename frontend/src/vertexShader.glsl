@@ -25,13 +25,7 @@ flat out int v_edgeId;
 
 void main() {
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
-
-    if (gl_VertexID == 7) {
-        v_edgeId = 6;   // trójkąt (0,6,7) -> krawędź 6
-    } else {
-        v_edgeId = gl_VertexID - 1; 
-        // bo trójkąt (0, i-1, i) powinien dostać id = i-1
-    }
+    v_edgeId = (gl_VertexID + 1) % 6;
 
     v_local = localPos;
     vec2 pos = u_center + localPos;
