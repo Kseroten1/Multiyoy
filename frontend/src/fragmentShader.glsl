@@ -24,34 +24,25 @@ float sdHexSq(vec2 p) {
     return dot(p, p) / (s * s);
 }
 
-// kolor krawędzi wg id 1..6
-vec3 edgeColor(int id) {
-    if (id == 0) return vec3(1.0, 0.0, 0.0); // czerwony
-    if (id == 1) return vec3(1.0, 0.5, 0.0); // pomarańczowy
-    if (id == 2) return vec3(1.0, 1.0, 0.0); // żółty
-    if (id == 3) return vec3(0.0, 1.0, 0.0); // zielony
-    if (id == 4) return vec3(0.0, 0.5, 1.0); // niebieski
-    if (id == 5) return vec3(0.6, 0.0, 1.0); // fioletowy
-    return vec3(1.0); // fallback (white)
-}
+// kolory krawędzi wg id 0..5 (stała tablica jak HEX_OFFSETS)
+const vec3 EDGE_DEBUG_COLORS[6] = vec3[](
+    vec3(1.0, 0.0, 0.0), // czerwony
+    vec3(1.0, 0.5, 0.0), // pomarańczowy
+    vec3(1.0, 1.0, 0.0), // żółty
+    vec3(0.0, 1.0, 0.0), // zielony
+    vec3(0.0, 0.5, 1.0), // niebieski
+    vec3(0.6, 0.0, 1.0)  // fioletowy
+);
 
 void main() {
+    float isCurrentPixelOnTopHalf = step(v_local.y, 0.0);
+    vec3 fillColor = mix(u_colorA, u_colorB, isCurrentPixelOnTopHalf);
+
     float dSq = sdHexSq(v_local);
-
-    // prosta grubość ramki (jednostki heksa)
     const float borderWidth = 0.06;
+    
+    float isCurrentPixelOnBorder = step(dSq, borderWidth * borderWidth);
+    vec3 pixelColor = mix(fillColor, EDGE_DEBUG_COLORS[v_edgeId], isCurrentPixelOnBorder);
 
-    // compare squared values
-    bool onBorder = dSq <= borderWidth * borderWidth;
-
-    // fill color
-    vec3 fillRGB = (v_local.y >= 0.0) ? u_colorA : u_colorB;
-    vec3 rgb = fillRGB;
-
-    // border overrides
-    if (onBorder) {
-        rgb = edgeColor(v_edgeId);
-    }
-
-    outColor = vec4(rgb, 1.0);
+    outColor = vec4(pixelColor, 1.0);
 }
