@@ -6,12 +6,12 @@ const vec2 HEX_OFFSETS[8] = vec2[](
     vec2(0.0, 0.0),
 
     // 6 corners, pointy-top (start at 30°, step 60°)
-    vec2( 0.8660254,  0.5),   // 30°  = (cos 30,  sin 30)
-    vec2( 0.0,        1.0),   // 90°
-    vec2(-0.8660254,  0.5),   // 150°
-    vec2(-0.8660254, -0.5),   // 210°
-    vec2( 0.0,       -1.0),   // 270°
-    vec2( 0.8660254, -0.5),   // 330°
+    vec2(cos(30.0), sin(30.0)),   // 30°  = (cos 30,  sin 30)
+    vec2(cos(90.0), sin(90.0)),   // 90°
+    vec2(cos(150.0), sin(150.0)),   // 150°
+    vec2(cos(210.0), sin(210.0)),   // 210°
+    vec2(cos(270.0), sin(270.0)),   // 270°
+    vec2(cos(330.0), sin(330.0)),   // 330°
 
     // repeat first corner to close the fan
     vec2( 0.8660254,  0.5)
