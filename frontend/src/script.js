@@ -50,6 +50,7 @@ const uMvpLoc = gl.getUniformLocation(program, "u_mvp"); // mat3
 const uCenterLoc = gl.getUniformLocation(program, "u_center");
 const uColorALoc = gl.getUniformLocation(program, 'u_colorA');
 const uColorBLoc = gl.getUniformLocation(program, 'u_colorB');
+const uEdgeMaskLoc = gl.getUniformLocation(program, 'u_edgeMask');
 
 const colorA = [1.0, 1.0, 1.0]; // polska
 const colorB = [0.9, 0.2, 0.2]; // gurom
@@ -59,6 +60,11 @@ const centers = [
     [-0.8660254, 0.0],
     [ 0.8660254, 0.0],
 ];
+const edgeMasks = [
+    [1,1,1,1,1,0],
+    [1,1,0,1,1,1],
+];
+
 let panOffset = { x: 0.0, y: 0.0 };
 let scale = 0.2;
 let angle = 0.0;
@@ -96,6 +102,12 @@ function updateUniforms() {
     gl.uniform3fv(uColorBLoc, colorB);
 }
 
+function makeMask(edgesEnabled) {
+    let m = 0 >>> 0;
+    for (let i = 0; i < 6; i++) if (edgesEnabled[i]) m |= (1 << i);
+    return m >>> 0;
+}
+
 function draw() {
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
@@ -110,6 +122,7 @@ function draw() {
     const vertexCount = 8; //N rim + 1 closing + rim center
     for (let i = 0; i < centers.length; i++) {
         gl.uniform2fv(uCenterLoc, new Float32Array(centers[i]));
+        gl.uniform1ui(uEdgeMaskLoc, makeMask(edgeMasks[i]));
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 8);
     }
 }
