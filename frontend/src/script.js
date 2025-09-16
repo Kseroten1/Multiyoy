@@ -57,12 +57,22 @@ const colorB = [0.9, 0.2, 0.2]; // gurom
 const backgroundColor = [0.07, 0.07, 0.07, 1]
 
 const centers = [
-    [-0.8660254, 0.0],
-    [ 0.8660254, 0.0],
+    [0.0, 0.0],        // C
+    [1.7320508075688772, 0.0],
+    [ 0.8660254037844386,  1.5],
+    [-0.8660254037844386,  1.5],
+    [-1.7320508075688772, 0.0],
+    [-0.8660254037844386, -1.5],
+    [ 0.8660254037844386, -1.5],
 ];
 const edgeMasks = [
-    [1,1,1,1,1,0],
-    [1,1,0,1,1,1],
+    [1,1,1,1,1,1],
+    [1,0,0,0,0,0],
+    [0,1,0,0,0,0],
+    [0,0,1,0,0,0],
+    [0,0,0,1,0,0],
+    [0,0,0,0,1,0],
+    [0,0,0,0,0,1],
 ];
 
 let panOffset = { x: 0.0, y: 0.0 };
@@ -77,8 +87,8 @@ function makeModelMat3(pan, scale, angle) {
         .scale(scale, scale)
         .rotate((angle * 180) / Math.PI)
         .translate(pan.x, pan.y);
-        
-        
+
+
 
     const m = new Float32Array(9);
     m[0] = dm.a;
@@ -149,7 +159,7 @@ canvas.addEventListener("pointerleave", endPointer);
 canvas.addEventListener("wheel", wheelMove);
 
 function endPointer(e) {
-    if (!dragging || e.pointerId !== activePointerId) return;
+    if (!dragging && e.pointerId !== activePointerId) return;
 
     dragging = false;
     activePointerId = -1;
@@ -181,7 +191,7 @@ function onPointerMove(e) {
 
     const clipDeltaX = (dx / rect.width) * 2.0;
     const clipDeltaY = -((dy / rect.height) * 2.0);
-    
+
     panOffset.x += clipDeltaX;
     panOffset.y += clipDeltaY;
 
@@ -190,7 +200,7 @@ function onPointerMove(e) {
 
 function wheelMove(e) {
     e.preventDefault();
-    
+
     const zoom = Math.exp(-e.deltaY * 0.001);
     const newScale = Math.max(0.05, Math.min(8.0, scale * zoom));
 
