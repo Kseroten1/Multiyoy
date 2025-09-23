@@ -105,8 +105,14 @@ function updateUniforms() {
 }
 
 function makeMask(edgesEnabled) {
-    let mask = 0 >>> 0;
-    for (let i = 0; i < 6; i++) if (edgesEnabled[i]) mask |= (1 << i);
+    let mask = 0;
+    for (let i = 0; i < 6; i++) {
+        if (edgesEnabled[i]) {
+            const singleBitMask = 1 << index; //ustaw jedynke na pozycji index 
+            mask = mask | singleBitMask; // operator OR, jeżeli na pozycji sprawdzanej było 0 a singleBitMask ma 1 to ustaw 1,
+            // jeżeli było 1 zostaw 1, jeżeli było zero i singleBitMask jest 0, zostaje 0 
+        }
+    }
     return mask >>> 0;
 }
 
