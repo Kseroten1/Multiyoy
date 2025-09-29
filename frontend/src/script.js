@@ -45,6 +45,9 @@ const uCenterLoc = gl.getUniformLocation(program, "u_center");
 const uColorALoc = gl.getUniformLocation(program, 'u_colorA');
 const uColorBLoc = gl.getUniformLocation(program, 'u_colorB');
 const uEdgeMaskLoc = gl.getUniformLocation(program, 'u_edgeMask');
+const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
+
+gl.uniform1f(uBorderLoc, 0.18);
 
 const colorA = [1.0, 1.0, 1.0]; // polska
 const colorB = [0.9, 0.2, 0.2]; // gurom
@@ -61,12 +64,12 @@ const centers = [
 ];
 const edgeMasks = [
     [1,1,1,1,1,1],
-    [1,0,0,0,0,0],
-    [0,1,0,0,0,0],
-    [0,0,1,0,0,0],
-    [0,0,0,1,0,0],
-    [0,0,0,0,1,0],
-    [0,0,0,0,0,1],
+    [1,1,1,0,0,0],
+    [0,1,1,1,0,0],
+    [0,0,1,1,1,0],
+    [0,0,0,1,1,1],
+    [1,0,0,0,1,1],
+    [1,1,0,0,0,1],
 ];
 
 let panOffset = { x: 0.0, y: 0.0 };
@@ -106,8 +109,8 @@ function updateUniforms() {
 
 function makeMask(edgesEnabled) {
     let mask = 0;
-    for (let i = 0; i < 6; i++) {
-        if (edgesEnabled[i]) {
+    for (let index = 0; index < 6; index++) {
+        if (edgesEnabled[index]) {
             const singleBitMask = 1 << index; //ustaw jedynke na pozycji index 
             mask = mask | singleBitMask; // operator OR, jeżeli na pozycji sprawdzanej było 0 a singleBitMask ma 1 to ustaw 1,
             // jeżeli było 1 zostaw 1, jeżeli było zero i singleBitMask jest 0, zostaje 0 
@@ -127,7 +130,6 @@ function draw() {
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)
     updateUniforms();
 
-    const vertexCount = 8; //N rim + 1 closing + rim center
     for (let i = 0; i < centers.length; i++) {
         gl.uniform2fv(uCenterLoc, new Float32Array(centers[i]));
         gl.uniform1ui(uEdgeMaskLoc, makeMask(edgeMasks[i]));

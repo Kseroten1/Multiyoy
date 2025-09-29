@@ -17,13 +17,9 @@ vec2(cos(radians(270.0)),  sin(radians(270.0)))   // 270°
 uniform mat3 u_mvp;
 uniform vec2 u_center;
 out vec2 v_local;
-flat out int v_edgeId;
-
 
 void main() {
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
-    v_edgeId = (gl_VertexID + 1) % 6;
-
     v_local = localPos;
     vec2 modelPos = u_center + localPos;
     vec3 clipPos = u_mvp * vec3(modelPos, 1.0);
