@@ -1,19 +1,22 @@
 #version 300 es
 precision highp float;
 
-uniform vec3  u_colorA;  // top color
-uniform vec3  u_colorB;  // bottom color
-uniform uint  u_edgeMask; // maska krawedzi 
-uniform float u_borderWidth;     // border width in local hex units
+uniform vec3  u_colorA;  // górny kolor
+uniform vec3  u_colorB;  // dolny color
+uniform uint  u_edgeMask;  // maska krawedzi 
+uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
 
 in vec2 v_local;
 out vec4 outColor;
 
-// Zwraca i-ty bit maski (0 lub 1). Zabezpiecza indeks.
+const float cos60 = cos(radians(60.0));
+const float sin60 = sin(radians(60.0));
+
+// Zwraca i-ty bit maski (0 lub 1).
 int getBitAt(uint mask, int index) {
-    uint shifted = mask >> uint(index); //przesuń bit o indeksie podanym na pozycję LSB (least significant bit)
-    uint lsb     = shifted & uint(1); // operacja AND czyli wyzerowanie wszystkich bitów poza pozycją 0 czyli LSB 
-    return int(lsb);
+    uint shifted = mask >> uint(index); // przesuniecie bitowe w prawo
+    uint hexSideMaskOn = shifted & uint(1); // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
+    return int(hexSideMaskOn);
 }
 
 const vec3 EDGE_COLORS[6] = vec3[](
@@ -25,32 +28,39 @@ const vec3 EDGE_COLORS[6] = vec3[](
   vec3(0.6, 0.0, 1.0)   // 6 fioletowy
 );
 
-//budujemy 3 skalary, które opisują położenie punktu względem 3 osi hexa
+// budujemy trzy projekcje piksela (pos) względem trzech osi 0, +60 stopni, -60 stopni
+// projekcja to rzut punktu na jeden z trzech kierunków 
 void hexAxes(vec2 pos, out float projA, out float projB, out float projC) {
-    projA = pos.x * 0.5 + pos.y * -sqrt(3.0)/2.0;
+    projA = pos.x * cos60 + pos.y * (-sin60);
     projB = pos.x;
-    projC = pos.x * 0.5 + pos.y * sqrt(3.0)/2.0;
+    projC = pos.x * cos60 + pos.y * sin60;
 }
 
-// Distance to the infinite line of a given side s.
-// For sides at +1, distance = 1 - t; for sides at -1, distance = 1 + t.
 float hexSideDistance(int sideIdx, float projA, float projB, float projC) {
+    // 3 projekcje, kazda odpowiada za 2 boki (dla proj = 1 lub -1), dlatego mod
     int idx = sideIdx % 3; // 0 -> projA 1 -> projB 2 -> projC
-    float sign = 1.0 - 2.0 * step(3.0, float(sideIdx)); // wynik step -> 0.0 jeśli x < edge - 1.0 jeśli x >= edge
-    // boki 1 2 3 daja wynik 0, 4 5 6 daja wynik 1, czyli sign to albo 1 albo - 1 
-    float proj = mix(
-        mix(projA, projB, float(idx == 1)),
-        projC,
-        float(idx == 2)
-    );
+    float isNegativeSide = float(sideIdx >= 3); // 0.0 dla 0..2, 1.0 dla 3..5
+    // wynik = mix(a, b, t)
+    // gdy t = 1 wynik = b
+    // gdy t = 0 wynik = a
+    // jest 3 przypadek gdy 0 < t < 1, ale nie korzystamy z tego nigdzie
+    float sign = mix(1.0, -1.0, isNegativeSide);
+    // ktora projekcja bedzie miala zastosowanie dla tej krawedzi
+    float isProjA = float(idx == 0);
+    float isProjB = float(idx == 1);
+    float isProjC = float(idx == 2);
+    float selectedAB = mix(projA, projB, isProjB);
+    float selectedProjection = mix(selectedAB, projC, isProjC);
 
-    return 1.0 - sign * proj; // + -> 1-proj, - -> 1+proj
+    return 1.0 - sign * selectedProjection; // + -> 1-projekcja, - -> 1+projekcja
 }
 
-// Determine which side pair is dominant, then pick side by sign.
-// Returns s0 in [0..5] and border distance dm (distance to hex boundary).
+// funkcja liczy : 
+// indeks najbliższej krawedzi -> sideIdx
+// jak daleko od krawedzi jestesmy -> margin
+// trzy projekcje do ponownego użycia
 void hex_nearest_side(
-    vec2 pos,
+    vec2  pos,
 out int   sideIdx,
 out float margin,
 out float projA,
@@ -63,7 +73,7 @@ out float projC
     float absProjB = abs(projB);
     float absProjC = abs(projC);
 
-    // Signed distance to hex boundary band (positive inside)
+    // odległośc od krawędzi (jeżeli dodatnia to jesteśmy wewnątrz hexa)
     float absMax = max(max(absProjA, absProjB), absProjC);
     margin = 1.0 - absMax;
 
@@ -75,26 +85,37 @@ out float projC
     float isAGreatest = aGreaterEqualB * aGreaterEqualC;
     float isBGreatest = (1.0 - isAGreatest) * (bGreaterEqualA * bGreaterEqualC);
     float isCGreatest = 1.0 - isAGreatest - isBGreatest;
-    //index osi 0/1/2
+// a -> projectionA (boki o indeksach 0, 3)
+// b -> projectionB (boki o indeksach 1, 4)
+// c -> projectionC (boki o indeksach 2, 5)  
+//               [a >= b ?]
+//               /        \
+//             tak         nie
+//             /             \
+//      [a >= c ?]          [b >= c ?]
+//        /     \             /     \
+//      tak     nie         tak      nie
+//     /          \         /          \
+//   isA=1       [b>=a?]  isB=1       isC=1
+//                /   \
+//              tak   nie
+//              /        \
+//           isB=1      isC=1
+    // index osi 0/1/2
     float dominantAxisIndexFloat = 0.0 * isAGreatest + 1.0 * isBGreatest + 2.0 * isCGreatest;
-    int dominantAxisIndex = int(dominantAxisIndexFloat + 0.5); // dodawanie 0.5 niweluje problemy przy wartościach float 0.999999 itp.
+    int dominantAxisIndex = int(dominantAxisIndexFloat); 
     
-    // wybór projekcji zwycięskiej osi (branchless)
-    float projAxis = mix(
-        mix(projA, projB, float(dominantAxisIndex == 1)),
-        projC,
-        float(dominantAxisIndex == 2)
-    );
-
-    // flaga znaku: 0 gdy projAxis >= 0, 1 gdy projAxis < 0
-    float signFlag = step(projAxis, 0.0);
+    // wybór projekcji zwycięskiej osi
+    float selectedAB = mix(projA, projB, float(dominantAxisIndex == 1));
+    float selectedProjection = mix(selectedAB, projC, float(dominantAxisIndex == 2));
+    float signFlag = step(selectedProjection, 0.0);
 
     // finalny indeks boku: 0..2 dla stron dodatnich, 3..5 dla ujemnych
     sideIdx = dominantAxisIndex + int(3.0 * signFlag);
 }
 
 void main() {
-    float isTop = step(v_local.y, 0.0); //
+    float isTop = step(v_local.y, 0.0);
     vec3 fillColor = mix(u_colorA, u_colorB, isTop);
 
     float projA, projB, projC;
@@ -111,37 +132,64 @@ void main() {
     // rysować najbliższy bok?
     float drawNearest = inBand * nearestOn * (1.0 - step(u_borderWidth, distanceNearest));
 
-    int sideLeft  = (nearestSideIdx + 5) % 6;
-    int sideRight = (nearestSideIdx + 1) % 6;
+    int previousSide = (nearestSideIdx + 5) % 6;
+    int nextSide = (nearestSideIdx + 1) % 6;
 
-    float distanceLeft  = hexSideDistance(sideLeft,  projA, projB, projC);
-    float distanceRight = hexSideDistance(sideRight, projA, projB, projC);
+    float distancePrevious = hexSideDistance(previousSide, projA, projB, projC);
+    float distanceNext = hexSideDistance(nextSide, projA, projB, projC);
 
-    float leftOn  = float(getBitAt(u_edgeMask, sideLeft)  != 0);
-    float rightOn = float(getBitAt(u_edgeMask, sideRight) != 0);
+    float previousOn = float(getBitAt(u_edgeMask, previousSide) != 0);
+    float nextOn = float(getBitAt(u_edgeMask, nextSide) != 0);
 
     // kandydaci do przejęcia klina
-    float canLeft  = inBand * (1.0 - nearestOn) * leftOn  * (1.0 - step(u_borderWidth, distanceLeft));
-    float canRight = inBand * (1.0 - nearestOn) * rightOn * (1.0 - step(u_borderWidth, distanceRight));
+    // 1) Czy piksel jest na krawedzi?
+    float inBorderBand = 1.0 - step(u_borderWidth, margin);
 
-    // wybór bliższego kandydata (branchless)
-    float hasLeft  = step(0.0, canLeft);
-    float hasRight = step(0.0, canRight);
-    float rightNotWorse = 1.0 - step(distanceLeft, distanceRight); // 1 gdy dRight <= dLeft
+    // 2) Czy najbliższa krawędź jest wyłączona?
+    float nearestDisabled = 1.0 - nearestOn;
 
-    float pickRight = hasRight * (1.0 - hasLeft + hasLeft * rightNotWorse);
-    float pickLeft  = 1.0 - pickRight;
+    // 3) Czy sąsiedzi są włączeni?
+    float previousEnabled = float(getBitAt(u_edgeMask, previousSide) != 0);
+    float nextEnabled = float(getBitAt(u_edgeMask, nextSide) != 0);
 
-    float drawLeftAdopt  = canLeft  * pickLeft;
-    float drawRightAdopt = canRight * pickRight;
+    // 4) Czy piksel leży na krawedzi danego sąsiada?
+    float inPreviousStroke = 1.0 - step(u_borderWidth, distancePrevious);
+    float inNextStroke = 1.0 - step(u_borderWidth, distanceNext);
 
-    float drawAny = clamp(drawNearest + drawLeftAdopt + drawRightAdopt, 0.0, 1.0);
+    // Maska adopcji (wszystkie cztery warunki na raz, 0/1)
+    float previousAdoptMask = inBorderBand * nearestDisabled * previousEnabled * inPreviousStroke;
+    float nextAdoptMask = inBorderBand * nearestDisabled * nextEnabled * inNextStroke;
+
+    // wybór bliższego kandydata
+    float previousCandidateExists = step(0.0, previousAdoptMask);
+    float nextCandidateExists = step(0.0, nextAdoptMask);
+    float nextCloserOrEqual = 1.0 - step(distancePrevious, distanceNext);
+
+    // przypadek: istnieje tylko next (previous nie istnieje)
+    float onlyNext = nextCandidateExists * (1.0 - previousCandidateExists);
+
+    // przypadek: istnieją obaj i next jest ≤ previous
+    float bothExist = nextCandidateExists * previousCandidateExists;
+    float nextWinsWhenBoth = bothExist * nextCloserOrEqual;
+
+    // finalny wybór next = "tylko next" LUB "obaj i next ≤ previous"
+    float chooseNext = onlyNext + nextWinsWhenBoth;
+
+    // previous to dopełnienie
+    float choosePrevious = 1.0 - chooseNext;
+
+    float shouldDrawWedgeFromPreviousEdge = previousAdoptMask * choosePrevious;
+    float shouldDrawWedgeFromNextEdge = nextAdoptMask * chooseNext;
+    // clamp (x, 0, 1) 
+    // jesli 0 < x < 1 zwraca x
+    // jesli x < 0 zwraca 0
+    // jesli x > 1 zwraca 1
+    float drawAny = clamp(drawNearest + shouldDrawWedgeFromPreviousEdge + shouldDrawWedgeFromNextEdge, 0.0, 1.0);
 
     int sideOutIdx = int(
     float(nearestSideIdx) * drawNearest
-    + float(sideLeft)       * drawLeftAdopt
-    + float(sideRight)      * drawRightAdopt
-    + 0.5
+    + float(previousSide) * shouldDrawWedgeFromPreviousEdge
+    + float(nextSide) * shouldDrawWedgeFromNextEdge
     );
 
     vec3 edgeColor = EDGE_COLORS[sideOutIdx];
