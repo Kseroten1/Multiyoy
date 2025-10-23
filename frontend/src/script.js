@@ -47,7 +47,7 @@ const uColorBLoc = gl.getUniformLocation(program, 'u_colorB');
 const uEdgeMaskLoc = gl.getUniformLocation(program, 'u_edgeMask');
 const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
 
-gl.uniform1f(uBorderLoc, 0.18);
+gl.uniform1f(uBorderLoc, 0.1);
 
 const colorA = [1.0, 1.0, 1.0]; // polska
 const colorB = [0.9, 0.2, 0.2]; // gurom
@@ -55,21 +55,22 @@ const backgroundColor = [0.07, 0.07, 0.07, 1]
 
 const centers = [
     [0.0, 0.0],        // C
-    [1.7320508075688772, 0.0],
     [ 0.8660254037844386,  1.5],
-    [-0.8660254037844386,  1.5],
-    [-1.7320508075688772, 0.0],
-    [-0.8660254037844386, -1.5],
+    [1.7320508075688772, 0.0],
     [ 0.8660254037844386, -1.5],
+    [-0.8660254037844386, -1.5],
+    [-1.7320508075688772, 0.0],
+    [-0.8660254037844386,  1.5],
 ];
 const edgeMasks = [
     [1,1,1,1,1,1],
+    [1,1,0,0,0,1],
     [1,1,1,0,0,0],
     [0,1,1,1,0,0],
     [0,0,1,1,1,0],
     [0,0,0,1,1,1],
     [1,0,0,0,1,1],
-    [1,1,0,0,0,1],
+    
 ];
 
 let panOffset = { x: 0.0, y: 0.0 };
