@@ -69,8 +69,7 @@ const edgeMasks = [
     [0,1,1,1,0,0],
     [0,0,1,1,1,0],
     [0,0,0,1,1,1],
-    [1,0,0,0,1,1],
-    
+    [1,0,0,0,1,1]
 ];
 
 let panOffset = { x: 0.0, y: 0.0 };
@@ -133,7 +132,7 @@ function draw() {
 
     for (let i = 0; i < centers.length; i++) {
         gl.uniform2fv(uCenterLoc, new Float32Array(centers[i]));
-        gl.uniform1ui(uEdgeMaskLoc, makeMask(edgeMasks[i]));
+        gl.uniform1i(uEdgeMaskLoc, makeMask(edgeMasks[i]));
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 8);
     }
 }

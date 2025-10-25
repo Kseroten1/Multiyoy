@@ -3,7 +3,7 @@ precision highp float;
 
 uniform vec3  u_colorA;  // górny kolor
 uniform vec3  u_colorB;  // dolny color
-uniform uint  u_edgeMask;  // maska krawedzi 
+uniform int  u_edgeMask;  // maska krawedzi 
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
 
 flat in int vertexID;
@@ -15,9 +15,9 @@ const float sin60 = sin(radians(60.0));
 const vec3 fillColor = vec3(1.0, 1.0, 1.0);
 
 // Zwraca i-ty bit maski (0 lub 1).
-int getBitAt(uint mask, int index) {
-    uint shifted = mask >> uint(index); // przesuniecie bitowe w prawo
-    uint hexSideMaskOn = shifted & uint(1); // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
+int getBitAt(int mask, int index) {
+    int shifted = mask >> int(index); // przesuniecie bitowe w prawo
+    int hexSideMaskOn = shifted & 1; // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
     return int(hexSideMaskOn);
 }
 
@@ -52,17 +52,44 @@ float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVer
     // (|Ax0 + By0 + C|)/sqrt(A^2+B^2)
     // !!! fajne zadanie na kolokwium
     // abs(A * point.x + B * point.y + C) / sqrt(A*A + B*B);
-    return -(A * point.x + B * point.y + C);
+    return abs(A * point.x + B * point.y + C);
 }
 
 void main() {
-    vec2 ver1 = HEX_OFFSETS[vertexID - 1];
-    vec2 ver2 = HEX_OFFSETS[vertexID];
-    float dist = pointRelativeDistanceFromLine(v_local, ver1, ver2);
-    vec3 color = mix(
-        fillColor,
-        EDGE_COLORS[vertexID - 2],
-        step(dist, u_borderWidth)
+    int edgeColorID = (vertexID - 2);
+
+    int firstVertexIndex = edgeColorID + 1;
+    int secondVertexIndex = ((edgeColorID + 1) % 6) + 1;
+    float distanceCurrent = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[firstVertexIndex], HEX_OFFSETS[secondVertexIndex]);
+
+    int currentSideOn = getBitAt(u_edgeMask, edgeColorID);
+    int previousSideOn = getBitAt(u_edgeMask, (edgeColorID + 5) % 6);
+    int nextSideOn = getBitAt(u_edgeMask, (edgeColorID + 1) % 6);
+
+    // Dystanse do sąsiadów
+    float distancePrevious = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[((edgeColorID + 5) % 6) + 1],
+        HEX_OFFSETS[(edgeColorID + 1)]
     );
+
+    float distanceNext = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[(edgeColorID + 2) % 6 + 1],
+        HEX_OFFSETS[((edgeColorID + 1) % 6) + 1]
+    );
+    vec3 color = fillColor;
+    // bieżąca aktywna krawędź
+    if (currentSideOn == 1 && distanceCurrent < u_borderWidth) {
+        color = EDGE_COLORS[edgeColorID];
+    }
+    // sąsiad wstecz: krawędź e‑1
+    else if (previousSideOn == 1 && distancePrevious < u_borderWidth) {
+        color = EDGE_COLORS[(edgeColorID + 5) % 6];
+    }
+    // sąsiad do przodu: krawędź e+1
+    else if (nextSideOn == 1 && distanceNext < u_borderWidth) {
+        color = EDGE_COLORS[(edgeColorID + 1) % 6];
+    }
     outColor = vec4(color, 1.0);
 }
