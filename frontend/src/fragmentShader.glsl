@@ -52,7 +52,7 @@ float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVer
     // (|Ax0 + By0 + C|)/sqrt(A^2+B^2)
     // !!! fajne zadanie na kolokwium
     // abs(A * point.x + B * point.y + C) / sqrt(A*A + B*B);
-    return abs(A * point.x + B * point.y + C);
+    return -(A * point.x + B * point.y + C);
 }
 
 void main() {
@@ -88,7 +88,7 @@ void main() {
         color = EDGE_COLORS[(edgeColorID + 5) % 6];
     }
     // sąsiad do przodu: krawędź e+1
-    else if (nextSideOn == 1 && distanceNext < u_borderWidth) {
+    else if (nextSideOn == 1 && -distanceNext < u_borderWidth) {
         color = EDGE_COLORS[(edgeColorID + 1) % 6];
     }
     outColor = vec4(color, 1.0);
