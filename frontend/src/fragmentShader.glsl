@@ -53,35 +53,33 @@ float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVer
     return -(A * point.x + B * point.y + C);
 }
 
-int wrapAround(int index, int max){
-    int result = index % max;
-    if (result < 0) {
-        result += max;
-    }
+int wrapAround(int index){
+    int result = index % 6;
+    result += int(result < 0) * 6;
     return result;
 }
 
 void main() {
-    int edgeID = wrapAround((vertexID - 2), 6);
-    int previousEdgeID = wrapAround((edgeID - 1), 6);
-    int nextEdgeID = wrapAround((edgeID + 1), 6);
+    int edgeID = wrapAround((vertexID - 2));
+    int previousEdgeID = wrapAround((edgeID - 1));
+    int nextEdgeID = wrapAround((edgeID + 1));
 
     float distanceCurrent = pointRelativeDistanceFromLine(
         v_local,
         HEX_OFFSETS[edgeID],
-        HEX_OFFSETS[wrapAround((edgeID + 1),6)]
+        HEX_OFFSETS[wrapAround((edgeID + 1))]
     );
 
     float distancePrevious = pointRelativeDistanceFromLine(
         v_local,
         HEX_OFFSETS[previousEdgeID],
-        HEX_OFFSETS[wrapAround((previousEdgeID + 1),6)]
+        HEX_OFFSETS[wrapAround((previousEdgeID + 1))]
     );
 
     float distanceNext = pointRelativeDistanceFromLine(
         v_local,
         HEX_OFFSETS[nextEdgeID],
-        HEX_OFFSETS[wrapAround((nextEdgeID + 1),6)]
+        HEX_OFFSETS[wrapAround((nextEdgeID + 1))]
     );
     
     int currentSideOn = getBitAt(u_edgeMask, edgeID);
