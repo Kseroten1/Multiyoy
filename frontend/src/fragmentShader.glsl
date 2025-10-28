@@ -56,40 +56,40 @@ float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVer
 }
 
 void main() {
-    int edgeColorID = (vertexID - 2);
+    // 6 dystansów (branchless)
+    float d0 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[1], HEX_OFFSETS[2]);
+    float d1 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[2], HEX_OFFSETS[3]);
+    float d2 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[3], HEX_OFFSETS[4]);
+    float d3 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[4], HEX_OFFSETS[5]);
+    float d4 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[5], HEX_OFFSETS[6]);
+    float d5 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[6], HEX_OFFSETS[1]);
 
-    int firstVertexIndex = edgeColorID + 1;
-    int secondVertexIndex = ((edgeColorID + 1) % 6) + 1;
-    float distanceCurrent = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[firstVertexIndex], HEX_OFFSETS[secondVertexIndex]);
+    // aktywne krawędzie (float maska)
+    float m0 = float((u_edgeMask >> 0) & 1);
+    float m1 = float((u_edgeMask >> 1) & 1);
+    float m2 = float((u_edgeMask >> 2) & 1);
+    float m3 = float((u_edgeMask >> 3) & 1);
+    float m4 = float((u_edgeMask >> 4) & 1);
+    float m5 = float((u_edgeMask >> 5) & 1);
 
-    int currentSideOn = getBitAt(u_edgeMask, edgeColorID);
-    int previousSideOn = getBitAt(u_edgeMask, (edgeColorID + 5) % 6);
-    int nextSideOn = getBitAt(u_edgeMask, (edgeColorID + 1) % 6);
+    // które blisko krawędzi
+    float e0 = (1.0 - step(u_borderWidth, d0)) * m0;
+    float e1 = (1.0 - step(u_borderWidth, d1)) * m1;
+    float e2 = (1.0 - step(u_borderWidth, d2)) * m2;
+    float e3 = (1.0 - step(u_borderWidth, d3)) * m3;
+    float e4 = (1.0 - step(u_borderWidth, d4)) * m4;
+    float e5 = (1.0 - step(u_borderWidth, d5)) * m5;
 
-    // Dystanse do sąsiadów
-    float distancePrevious = pointRelativeDistanceFromLine(
-        v_local,
-        HEX_OFFSETS[((edgeColorID + 5) % 6) + 1],
-        HEX_OFFSETS[(edgeColorID + 1)]
-    );
+    vec3 edgeColor =
+    e0 * EDGE_COLORS[0]
+    + e1 * EDGE_COLORS[1]
+    + e2 * EDGE_COLORS[2]
+    + e3 * EDGE_COLORS[3]
+    + e4 * EDGE_COLORS[4]
+    + e5 * EDGE_COLORS[5];
 
-    float distanceNext = pointRelativeDistanceFromLine(
-        v_local,
-        HEX_OFFSETS[(edgeColorID + 2) % 6 + 1],
-        HEX_OFFSETS[((edgeColorID + 1) % 6) + 1]
-    );
-    vec3 color = fillColor;
-    // bieżąca aktywna krawędź
-    if (currentSideOn == 1 && distanceCurrent < u_borderWidth) {
-        color = EDGE_COLORS[edgeColorID];
-    }
-    // sąsiad wstecz: krawędź e‑1
-    else if (previousSideOn == 1 && distancePrevious < u_borderWidth) {
-        color = EDGE_COLORS[(edgeColorID + 5) % 6];
-    }
-    // sąsiad do przodu: krawędź e+1
-    else if (nextSideOn == 1 && -distanceNext < u_borderWidth) {
-        color = EDGE_COLORS[(edgeColorID + 1) % 6];
-    }
+    float anyEdge = clamp(e0 + e1 + e2 + e3 + e4 + e5, 0.0, 1.0);
+    vec3 color = mix(fillColor, edgeColor, anyEdge);
+
     outColor = vec4(color, 1.0);
 }
