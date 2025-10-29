@@ -42,17 +42,13 @@ gl.bindVertexArray(vao);
 // Look up uniform locations we will set each frame
 const uMvpLoc = gl.getUniformLocation(program, "u_mvp"); // mat3
 const uCenterLoc = gl.getUniformLocation(program, "u_center");
-const uColorALoc = gl.getUniformLocation(program, 'u_colorA');
-const uColorBLoc = gl.getUniformLocation(program, 'u_colorB');
 const uEdgeMaskLoc = gl.getUniformLocation(program, 'u_edgeMask');
 const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
+const uFillColorMaskLoc = gl.getUniformLocation(program, "u_fillColorMask")
 
 gl.uniform1f(uBorderLoc, 0.1);
 
-const colorA = [1.0, 1.0, 1.0]; // polska
-const colorB = [0.9, 0.2, 0.2]; // gurom
 const backgroundColor = [0.07, 0.07, 0.07, 1]
-
 const centers = [
     [0.0, 0.0],        // C
     [ 0.8660254037844386,  1.5],
@@ -71,6 +67,15 @@ const edgeMasks = [
     [0,0,0,1,1,1],
     [1,0,0,0,1,1]
 ];
+const fillColorMask = [
+    [0b0000,0b0001, 1],
+    [0b0010,0b0011, 1],
+    [0b0100,0b0101, 0],
+    [0b0110,0b0111, 0],
+    [0b1000,0b1001, 1],
+    [0b1010,0b1010, 0],
+    [0b1100,0b1100, 1]
+]
 
 let panOffset = { x: 0.0, y: 0.0 };
 let scale = 1.0;
@@ -103,8 +108,6 @@ function makeModelMat3(pan, scale, angle) {
 function updateUniforms() {
     const modelMat = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, modelMat);
-    gl.uniform3fv(uColorALoc, colorA);
-    gl.uniform3fv(uColorBLoc, colorB);
 }
 
 function makeMask(edgesEnabled) {
@@ -117,6 +120,12 @@ function makeMask(edgesEnabled) {
         }
     }
     return mask;
+}
+
+function makeHexColorMask(color1, color2, isVertical) {
+    const orientationBit = isVertical ? 1 : 0;
+    // bit 0–3 → color1, bit 4–7 → color2, bit 8 → orientacja
+    return (orientationBit << 8) | (color2 << 4) | color1;
 }
 
 function draw() {
@@ -132,6 +141,8 @@ function draw() {
 
     for (let i = 0; i < centers.length; i++) {
         gl.uniform2fv(uCenterLoc, new Float32Array(centers[i]));
+        const [color1, color2, isVertical] = fillColorMask[i];
+        gl.uniform1i(uFillColorMaskLoc, makeHexColorMask(color1, color2, isVertical));
         gl.uniform1i(uEdgeMaskLoc, makeMask(edgeMasks[i]));
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 8);
     }
