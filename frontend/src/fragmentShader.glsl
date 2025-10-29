@@ -21,15 +21,13 @@ int getBitAt(int mask, int index) {
     return int(hexSideMaskOn);
 }
 
-const vec2 HEX_OFFSETS[8] = vec2[](
-    vec2(0.0, 0.0),   // V0 (center)
-    vec2(cos(radians(90.0)),   sin(radians(90.0))),   // V1 – góra
-    vec2(cos(radians(30.0)),   sin(radians(30.0))),   // V2 – prawy‑góra
-    vec2(cos(radians(330.0)),  sin(radians(330.0))),  // V3 – prawy‑dół
-    vec2(cos(radians(270.0)),  sin(radians(270.0))),  // V4 – dół
-    vec2(cos(radians(210.0)),  sin(radians(210.0))),  // V5 – lewy‑dół
-    vec2(cos(radians(150.0)),  sin(radians(150.0))),  // V6 – lewy‑góra
-    vec2(cos(radians(90.0)),   sin(radians(90.0)))    // powtórka V1 – domknięcie
+const vec2 HEX_OFFSETS[6] = vec2[](
+    vec2(cos(radians(90.0)),   sin(radians(90.0))),   // V0 – góra
+    vec2(cos(radians(30.0)),   sin(radians(30.0))),   // V1 – prawy‑góra
+    vec2(cos(radians(330.0)),  sin(radians(330.0))),  // V2 – prawy‑dół
+    vec2(cos(radians(270.0)),  sin(radians(270.0))),  // V3 – dół
+    vec2(cos(radians(210.0)),  sin(radians(210.0))),  // V4 – lewy‑dół
+    vec2(cos(radians(150.0)),  sin(radians(150.0)))  // V5 – lewy‑góra
 );
 
 const vec3 EDGE_COLORS[6] = vec3[](
@@ -55,41 +53,50 @@ float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVer
     return -(A * point.x + B * point.y + C);
 }
 
+int wrapAround(int index, int max){
+    int result = index % max;
+    if (result < 0) {
+        result += max;
+    }
+    return result;
+}
+
 void main() {
-    // 6 dystansów (branchless)
-    float d0 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[1], HEX_OFFSETS[2]);
-    float d1 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[2], HEX_OFFSETS[3]);
-    float d2 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[3], HEX_OFFSETS[4]);
-    float d3 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[4], HEX_OFFSETS[5]);
-    float d4 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[5], HEX_OFFSETS[6]);
-    float d5 = pointRelativeDistanceFromLine(v_local, HEX_OFFSETS[6], HEX_OFFSETS[1]);
+    int edgeID = wrapAround((vertexID - 2), 6);
+    int previousEdgeID = wrapAround((edgeID - 1), 6);
+    int nextEdgeID = wrapAround((edgeID + 1), 6);
 
-    // aktywne krawędzie (float maska)
-    float m0 = float((u_edgeMask >> 0) & 1);
-    float m1 = float((u_edgeMask >> 1) & 1);
-    float m2 = float((u_edgeMask >> 2) & 1);
-    float m3 = float((u_edgeMask >> 3) & 1);
-    float m4 = float((u_edgeMask >> 4) & 1);
-    float m5 = float((u_edgeMask >> 5) & 1);
+    float distanceCurrent = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[edgeID],
+        HEX_OFFSETS[wrapAround((edgeID + 1),6)]
+    );
 
-    // które blisko krawędzi
-    float e0 = (1.0 - step(u_borderWidth, d0)) * m0;
-    float e1 = (1.0 - step(u_borderWidth, d1)) * m1;
-    float e2 = (1.0 - step(u_borderWidth, d2)) * m2;
-    float e3 = (1.0 - step(u_borderWidth, d3)) * m3;
-    float e4 = (1.0 - step(u_borderWidth, d4)) * m4;
-    float e5 = (1.0 - step(u_borderWidth, d5)) * m5;
+    float distancePrevious = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[previousEdgeID],
+        HEX_OFFSETS[wrapAround((previousEdgeID + 1),6)]
+    );
 
-    vec3 edgeColor =
-    e0 * EDGE_COLORS[0]
-    + e1 * EDGE_COLORS[1]
-    + e2 * EDGE_COLORS[2]
-    + e3 * EDGE_COLORS[3]
-    + e4 * EDGE_COLORS[4]
-    + e5 * EDGE_COLORS[5];
+    float distanceNext = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[nextEdgeID],
+        HEX_OFFSETS[wrapAround((nextEdgeID + 1),6)]
+    );
+    
+    int currentSideOn = getBitAt(u_edgeMask, edgeID);
+    int previousSideOn = getBitAt(u_edgeMask, previousEdgeID);
+    int nextSideOn = getBitAt(u_edgeMask, nextEdgeID);
+    
+    vec3 color = fillColor;
 
-    float anyEdge = clamp(e0 + e1 + e2 + e3 + e4 + e5, 0.0, 1.0);
-    vec3 color = mix(fillColor, edgeColor, anyEdge);
+    float currentMask = float(currentSideOn) * step(distanceCurrent, u_borderWidth);
+    float prevMask = float(previousSideOn) * step(distancePrevious, u_borderWidth);
+    float nextMask = float(nextSideOn) * step(distanceNext, u_borderWidth);
+
+    color = mix(color, EDGE_COLORS[nextEdgeID], nextMask);
+    color = mix(color, EDGE_COLORS[previousEdgeID], prevMask * (1.0 - nextMask));
+    color = mix(color, EDGE_COLORS[edgeID], currentMask * (1.0 - prevMask) * (1.0 - nextMask));
 
     outColor = vec4(color, 1.0);
 }
