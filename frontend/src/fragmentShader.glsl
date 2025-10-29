@@ -87,16 +87,16 @@ void main() {
     int currentSideOn = getBitAt(u_edgeMask, edgeID);
     int previousSideOn = getBitAt(u_edgeMask, previousEdgeID);
     int nextSideOn = getBitAt(u_edgeMask, nextEdgeID);
-    
-    vec3 color = fillColor;
 
     float currentMask = float(currentSideOn) * step(distanceCurrent, u_borderWidth);
     float prevMask = float(previousSideOn) * step(distancePrevious, u_borderWidth);
     float nextMask = float(nextSideOn) * step(distanceNext, u_borderWidth);
 
-    color = mix(color, EDGE_COLORS[nextEdgeID], nextMask);
-    color = mix(color, EDGE_COLORS[previousEdgeID], prevMask * (1.0 - nextMask));
-    color = mix(color, EDGE_COLORS[edgeID], currentMask * (1.0 - prevMask) * (1.0 - nextMask));
+    vec3 color =
+    fillColor * (1.0 - currentMask) * (1.0 - prevMask) * (1.0 - nextMask) +
+    EDGE_COLORS[nextEdgeID] * nextMask * (1.0 - prevMask) * (1.0 - currentMask) +
+    EDGE_COLORS[previousEdgeID] * prevMask * (1.0 - currentMask) +
+    EDGE_COLORS[edgeID] * currentMask;
 
     outColor = vec4(color, 1.0);
 }
