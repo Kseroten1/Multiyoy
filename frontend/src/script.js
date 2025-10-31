@@ -94,10 +94,9 @@ let angle = 0.0;
 function makeModelMat3(pan, scale, angle) {
     const aspect = canvas.width / canvas.height; // w pikselach
     const domMatrix = new DOMMatrix()
-        .scale(1, aspect)
-        .scale(scale, scale)
-        .rotate((angle * 180) / Math.PI)
-        .translate(pan.x, pan.y);
+        .translate(pan.x, pan.y)
+        .scale(scale / aspect, scale)
+        .rotate((angle * 180) / Math.PI);
 
     const modelMat3 = new Float32Array(9);
     modelMat3[0] = domMatrix.a;
@@ -215,7 +214,7 @@ function wheelMove(e) {
     e.preventDefault();
 
     const zoom = Math.exp(-e.deltaY * 0.001);
-    const newScale = Math.max(0.05, Math.min(8.0, scale * zoom));
+    const newScale = Math.max(0.000001, Math.min(500.0, scale * zoom));
 
     scale = newScale;
     draw();
