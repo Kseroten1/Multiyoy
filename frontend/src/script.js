@@ -49,15 +49,6 @@ const uFillColorMaskLoc = gl.getUniformLocation(program, "u_fillColorMask")
 gl.uniform1f(uBorderLoc, 0.1);
 
 const backgroundColor = [0.07, 0.07, 0.07, 1]
-const centers = [
-    [0.0, 0.0],        // C
-    [ 0.8660254037844386,  1.5],
-    [1.7320508075688772, 0.0],
-    [ 0.8660254037844386, -1.5],
-    [-0.8660254037844386, -1.5],
-    [-1.7320508075688772, 0.0],
-    [-0.8660254037844386,  1.5],
-];
 const edgeMasks = [
     [1,1,1,1,1,1],
     [1,1,0,0,0,1],
@@ -76,6 +67,24 @@ const fillColorMask = [
     [0b1010,0b1010, 0],
     [0b1100,0b1100, 1]
 ]
+function axialToCenter(q, r, size) {
+    const x = size * Math.sqrt(3) * (q + r / 2);
+    const y = size * (3 / 2) * r;
+    return [x, y];
+}
+
+function generateAxialHexCenters(radius, size) {
+    const centers = [];
+    for (let q = -radius; q <= radius; q++) {
+        for (let r = -radius; r <= radius; r++) {
+            if (Math.abs(q + r) > radius) continue;
+            centers.push(axialToCenter(q, r, size));
+        }
+    }
+    return centers;
+}
+
+const centers = generateAxialHexCenters(10, 1.0);
 
 let panOffset = { x: 0.0, y: 0.0 };
 let scale = 1.0;
@@ -141,9 +150,9 @@ function draw() {
 
     for (let i = 0; i < centers.length; i++) {
         gl.uniform2fv(uCenterLoc, new Float32Array(centers[i]));
-        const [color1, color2, isVertical] = fillColorMask[i];
+        const [color1, color2, isVertical] = fillColorMask[i % fillColorMask.length];
         gl.uniform1i(uFillColorMaskLoc, makeHexColorMask(color1, color2, isVertical));
-        gl.uniform1i(uEdgeMaskLoc, makeMask(edgeMasks[i]));
+        gl.uniform1i(uEdgeMaskLoc, makeMask(edgeMasks[i % edgeMasks.length]));
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 8);
     }
 }
