@@ -1,11 +1,10 @@
 #version 300 es
 precision highp float;
 
-uniform int  u_edgeMask;  // maska krawedzi 
+flat in int v_edgeMask;  // maska krawedzi 
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
-uniform int u_fillColorMask;
-
-flat in int vertexID;
+flat in int v_fillColorMask;
+flat in int v_vertexID;
 in vec2 v_local;
 out vec4 outColor;
 
@@ -13,7 +12,6 @@ const float cos60 = cos(radians(60.0));
 const float sin60 = sin(radians(60.0));
 const vec3 fillColor = vec3(1.0, 1.0, 1.0);
 
-// Zwraca i-ty bit maski (0 lub 1).
 int getBitAt(int mask, int index) {
     int shifted = mask >> int(index); // przesuniecie bitowe w prawo
     int hexSideMaskOn = shifted & 1; // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
@@ -58,16 +56,9 @@ const vec3 FILL_COLORS[16] = vec3[](
 );
 
 float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVertex) {
-    // Współczynniki prostej opisanej na dwóch punktach (firstVertex, secondVertex)
-    // Ax + By + C - wzór prostej 
     float A = firstVertex.y - secondVertex.y;
     float B = secondVertex.x - firstVertex.x;
     float C = firstVertex.x * secondVertex.y - secondVertex.x * firstVertex.y;
-    // zwracamy odległość punktu od prostej wzór:
-    // punkt (x0, y0)
-    // (|Ax0 + By0 + C|)/sqrt(A^2+B^2)
-    // !!! fajne zadanie na kolokwium
-    // abs(A * point.x + B * point.y + C) / sqrt(A*A + B*B);
     return -(A * point.x + B * point.y + C);
 }
 
@@ -78,14 +69,14 @@ int wrapAround(int index){
 }
 
 void main() {
-    vec3 fillColorFirst = FILL_COLORS[u_fillColorMask & 0xF];
-    vec3 fillColorSecond = FILL_COLORS[(u_fillColorMask >> 4) & 0xF];
-    int isVertical = (u_fillColorMask >> 8) & 1;
+    vec3 fillColorFirst = FILL_COLORS[v_fillColorMask & 0xF];
+    vec3 fillColorSecond = FILL_COLORS[(v_fillColorMask >> 4) & 0xF];
+    int isVertical = (v_fillColorMask >> 8) & 1;
     float splitCoord = mix(v_local.y, v_local.x, float(isVertical));
     float t = step(0.0, splitCoord);
     vec3 baseFillColor = mix(fillColorFirst, fillColorSecond, t);
-    
-    int edgeID = wrapAround((vertexID - 2));
+
+    int edgeID = wrapAround((v_vertexID - 2));
     int previousEdgeID = wrapAround((edgeID - 1));
     int nextEdgeID = wrapAround((edgeID + 1));
 
@@ -106,10 +97,10 @@ void main() {
         HEX_OFFSETS[nextEdgeID],
         HEX_OFFSETS[wrapAround((nextEdgeID + 1))]
     );
-    
-    int currentSideOn = getBitAt(u_edgeMask, edgeID);
-    int previousSideOn = getBitAt(u_edgeMask, previousEdgeID);
-    int nextSideOn = getBitAt(u_edgeMask, nextEdgeID);
+
+    int currentSideOn = getBitAt(v_edgeMask, edgeID);
+    int previousSideOn = getBitAt(v_edgeMask, previousEdgeID);
+    int nextSideOn = getBitAt(v_edgeMask, nextEdgeID);
 
     float currentMask = float(currentSideOn) * step(distanceCurrent, u_borderWidth);
     float prevMask = float(previousSideOn) * step(distancePrevious, u_borderWidth);

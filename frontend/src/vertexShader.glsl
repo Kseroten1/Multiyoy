@@ -13,13 +13,19 @@ const vec2 HEX_OFFSETS[8] = vec2[](
 );
 
 uniform mat3 u_mvp;
-uniform vec2 u_center;
+in vec2 u_center;
+in int u_edgeMask;
+in int u_fillColorMask;
+flat out int v_vertexID;
+flat out int v_edgeMask;
+flat out int v_fillColorMask;
 out vec2 v_local;
-flat out int vertexID;
 
 void main() {
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
-    vertexID = gl_VertexID;
+    v_vertexID = gl_VertexID;
+    v_edgeMask = u_edgeMask;
+    v_fillColorMask = u_fillColorMask;
     v_local = localPos;
     vec2 modelPos = u_center + localPos;
     vec3 clipPos = u_mvp * vec3(modelPos, 1.0);

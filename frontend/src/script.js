@@ -41,10 +41,10 @@ gl.bindVertexArray(vao);
 
 // Look up uniform locations we will set each frame
 const uMvpLoc = gl.getUniformLocation(program, "u_mvp"); // mat3
-const uCenterLoc = gl.getUniformLocation(program, "u_center");
-const uEdgeMaskLoc = gl.getUniformLocation(program, 'u_edgeMask');
+const uCenterLoc = gl.getAttribLocation(program, "u_center");
+const uEdgeMaskLoc = gl.getAttribLocation(program, "u_edgeMask");
 const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
-const uFillColorMaskLoc = gl.getUniformLocation(program, "u_fillColorMask")
+const uFillColorMaskLoc = gl.getAttribLocation(program, "u_fillColorMask");
 
 gl.uniform1f(uBorderLoc, 0.1);
 
@@ -67,6 +67,7 @@ const fillColorMask = [
     [0b1010,0b1010, 0],
     [0b1100,0b1100, 1]
 ]
+
 function axialToCenter(q, r, size) {
     const x = size * Math.sqrt(3) * (q + r / 2);
     const y = size * (3 / 2) * r;
@@ -84,13 +85,12 @@ function generateAxialHexCenters(radius, size) {
     return centers;
 }
 
-const centers = generateAxialHexCenters(10, 1.0);
+const centers = generateAxialHexCenters(600, 1.0);
 
 let panOffset = { x: 0.0, y: 0.0 };
 let scale = 1.0;
 let angle = 0.0;
 
-// DOMMatrix -> mat3 column-major for GLSL
 function makeModelMat3(pan, scale, angle) {
     const aspect = canvas.width / canvas.height; // w pikselach
     const domMatrix = new DOMMatrix()
@@ -102,11 +102,9 @@ function makeModelMat3(pan, scale, angle) {
     modelMat3[0] = domMatrix.a;
     modelMat3[1] = domMatrix.b;
     modelMat3[2] = 0;
-
     modelMat3[3] = domMatrix.c;
     modelMat3[4] = domMatrix.d;
     modelMat3[5] = 0;
-
     modelMat3[6] = domMatrix.e;
     modelMat3[7] = domMatrix.f;
     modelMat3[8] = 1;
@@ -122,9 +120,8 @@ function makeMask(edgesEnabled) {
     let mask = 0;
     for (let index = 0; index < 6; index++) {
         if (edgesEnabled[index]) {
-            const singleBitMask = 1 << index; //ustaw jedynke na pozycji index 
+            const singleBitMask = 1 << index;
             mask = mask | singleBitMask;
-            // jeżeli było 1 zostaw 1, jeżeli było zero i singleBitMask jest 0, zostaje 0 
         }
     }
     return mask;
@@ -132,10 +129,43 @@ function makeMask(edgesEnabled) {
 
 function makeHexColorMask(color1, color2, isVertical) {
     const orientationBit = isVertical ? 1 : 0;
-    // bit 0–3 → color1, bit 4–7 → color2, bit 8 → orientacja
     return (orientationBit << 8) | (color2 << 4) | color1;
 }
 
+const centerData = new Float32Array(centers.flat());
+const centerBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, centerBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, centerData, gl.STATIC_DRAW);
+gl.enableVertexAttribArray(uCenterLoc);
+gl.vertexAttribPointer(uCenterLoc, 2, gl.FLOAT, false, 0, 0);
+gl.vertexAttribDivisor(uCenterLoc, 1);
+
+const edgeMaskData = new Int32Array(
+    centers.map((_, i) => makeMask(edgeMasks[i % edgeMasks.length]))
+);
+const edgeMaskBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, edgeMaskBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, edgeMaskData, gl.STATIC_DRAW);
+if (uEdgeMaskLoc !== -1) {
+    gl.enableVertexAttribArray(uEdgeMaskLoc);
+    gl.vertexAttribIPointer(uEdgeMaskLoc, 1, gl.INT, 0, 0);
+    gl.vertexAttribDivisor(uEdgeMaskLoc, 1);
+}
+
+const fillMaskData = new Int32Array(
+    centers.map((_, i) => {
+        const [c1, c2, v] = fillColorMask[i % fillColorMask.length];
+        return makeHexColorMask(c1, c2, v);
+    })
+);
+const fillMaskBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, fillMaskBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, fillMaskData, gl.STATIC_DRAW);
+if (uFillColorMaskLoc !== -1) {
+    gl.enableVertexAttribArray(uFillColorMaskLoc);
+    gl.vertexAttribIPointer(uFillColorMaskLoc, 1, gl.INT, 0, 0);
+    gl.vertexAttribDivisor(uFillColorMaskLoc, 1);
+}
 function draw() {
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
@@ -147,13 +177,7 @@ function draw() {
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)
     updateUniforms();
 
-    for (let i = 0; i < centers.length; i++) {
-        gl.uniform2fv(uCenterLoc, new Float32Array(centers[i]));
-        const [color1, color2, isVertical] = fillColorMask[i % fillColorMask.length];
-        gl.uniform1i(uFillColorMaskLoc, makeHexColorMask(color1, color2, isVertical));
-        gl.uniform1i(uEdgeMaskLoc, makeMask(edgeMasks[i % edgeMasks.length]));
-        gl.drawArrays(gl.TRIANGLE_FAN, 0, 8);
-    }
+    gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, centers.length);
 }
 
 draw(); // initial draw
@@ -172,7 +196,6 @@ canvas.addEventListener("wheel", wheelMove);
 
 function endPointer(e) {
     if (!dragging || e.pointerId !== activePointerId) return;
-
     dragging = false;
     activePointerId = -1;
     canvas.releasePointerCapture(e.pointerId);
@@ -181,41 +204,32 @@ function endPointer(e) {
 function onPointerDown(e) {
     if (dragging) return;
     e.preventDefault();
-
     activePointerId = e.pointerId;
     dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
-
     canvas.setPointerCapture(activePointerId);
 }
 
 function onPointerMove(e) {
     if (!dragging) return;
     if (e.pointerId !== activePointerId) return;
-
     e.preventDefault();
-
     var deltaX = e.clientX - lastX;
     var deltaY = e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
-
     const clipDeltaX = (deltaX / rect.width) * 2.0;
     const clipDeltaY = -((deltaY / rect.height) * 2.0);
-
     panOffset.x += clipDeltaX;
     panOffset.y += clipDeltaY;
-
     draw();
 }
 
 function wheelMove(e) {
     e.preventDefault();
-
     const zoom = Math.exp(-e.deltaY * 0.001);
     const newScale = Math.max(0.000001, Math.min(500.0, scale * zoom));
-
     scale = newScale;
     draw();
 }
