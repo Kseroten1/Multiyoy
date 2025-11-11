@@ -1,8 +1,11 @@
 import vertexShaderString from './vertexShader.glsl?raw'
 import fragmentShaderString from './fragmentShader.glsl?raw'
+import * as culori from 'https://cdn.jsdelivr.net/npm/culori@4.0.2/+esm';
 
 const canvas = document.getElementById("main");
-const gl = canvas.getContext("webgl2"); // ask for WebGL2 (newer GL). Required for gl_VertexID.
+const gl = canvas.getContext("webgl2", {
+        colorSpace: "display-p3"
+    }); // ask for WebGL2 (newer GL). Required for gl_VertexID.
 
 const vertexShaderSource = vertexShaderString;
 const fragmentShaderSource = fragmentShaderString;
@@ -47,6 +50,53 @@ const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
 const uFillColorMaskLoc = gl.getAttribLocation(program, "u_fillColorMask");
 
 gl.uniform1f(uBorderLoc, 0.1);
+let brightness = 1.0;
+let saturation = 1.0;
+let colorTableHex = [
+    "#001f3f",
+    "#0074D9",
+    "#7FDBFF",
+    "#39CCCC",
+    "#B10DC9",
+    "#F012BE",
+    "#85144b",
+    "#FF4136",
+    "#FF851B",
+    "#FFDC00",
+    "#3D9970",
+    "#2ECC40",
+    "#01FF70",
+    "#AAAAAA",
+];
+let baseOklchColors = colorTableHex.map(h => culori.oklch(culori.rgb(h)));
+function scaledOklchColors(brightnessScale, chromaScale) {
+    return baseOklchColors.map(c => ({
+        mode: 'oklch',
+        l: Math.min(1, c.l * brightnessScale),
+        c: c.c * chromaScale,
+        h: c.h
+    }));
+}
+function oklchToRgbArray(oklch) {
+    const l = Math.pow(Math.min(1, oklch.l), 0.9);
+    const c = oklch.c / (1 + oklch.c) * 2.0;
+
+    const rgb = culori.rgb({ mode: 'oklch', l, c, h: oklch.h }, 'p3');
+    const max = Math.max(rgb.r, rgb.g, rgb.b);
+    const r = Math.max(0, Math.min(1, rgb.r / (max > 1 ? max : 1)));
+    const g = Math.max(0, Math.min(1, rgb.g / (max > 1 ? max : 1)));
+    const b = Math.max(0, Math.min(1, rgb.b / (max > 1 ? max : 1)));
+    return [r, g, b];
+}
+const uFillColorsLoc = gl.getUniformLocation(program, "FILL_COLORS");
+
+function updateColorTable() {
+    const adjusted = scaledOklchColors(brightness, saturation);
+    const rgbArray = adjusted.map(ok => oklchToRgbArray(ok));
+    const flat = new Float32Array(rgbArray.flat());
+    gl.useProgram(program);
+    gl.uniform3fv(uFillColorsLoc, flat);
+}
 
 const backgroundColor = [0.07, 0.07, 0.07, 1]
 const edgeMasks = [
@@ -114,6 +164,7 @@ function makeModelMat3(pan, scale, angle) {
 function updateUniforms() {
     const modelMat = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, modelMat);
+    updateColorTable();
 }
 
 function makeMask(edgesEnabled) {
@@ -153,8 +204,10 @@ if (uEdgeMaskLoc !== -1) {
 }
 
 const fillMaskData = new Int32Array(
-    centers.map((_, i) => {
-        const [c1, c2, v] = fillColorMask[i % fillColorMask.length];
+    centers.map(() => {
+        const c1 = Math.floor(Math.random() * 14);
+        const c2 = Math.floor(Math.random() * 14);
+        const v  = Math.random() > 0.5 ? 1 : 0; // random split orientation
         return makeHexColorMask(c1, c2, v);
     })
 );
@@ -193,6 +246,14 @@ canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("pointerleave", endPointer);
 canvas.addEventListener("wheel", wheelMove);
+document.getElementById("brightness").addEventListener("input", (e) => {
+        brightness = parseFloat(e.target.value);
+        draw();
+});
+document.getElementById("saturation").addEventListener("input", (e) => {
+        saturation = parseFloat(e.target.value);
+        draw();
+});
 
 function endPointer(e) {
     if (!dragging || e.pointerId !== activePointerId) return;

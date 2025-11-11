@@ -36,24 +36,7 @@ const vec3 EDGE_COLORS[6] = vec3[](
     vec3(0.6, 0.0, 1.0)   // 5 fioletowy
 );
 
-const vec3 FILL_COLORS[16] = vec3[](
-    vec3(0.000, 0.122, 0.247), // NAVY #001f3f
-    vec3(0.000, 0.455, 0.851), // BLUE #0074D9
-    vec3(0.498, 0.859, 1.000), // AQUA #7FDBFF
-    vec3(0.224, 0.800, 0.800), // TEAL #39CCCC
-    vec3(0.694, 0.051, 0.788), // PURPLE #B10DC9
-    vec3(0.941, 0.071, 0.745), // FUCHSIA #F012BE
-    vec3(0.522, 0.078, 0.294), // MAROON #85144B
-    vec3(1.000, 0.255, 0.212), // RED #FF4136
-    vec3(1.000, 0.521, 0.106), // ORANGE #FF851B
-    vec3(1.000, 0.863, 0.000), // YELLOW #FFDC00
-    vec3(0.239, 0.600, 0.439), // OLIVE #3D9970
-    vec3(0.180, 0.800, 0.251), // GREEN #2ECC40
-    vec3(0.004, 1.000, 0.439), // LIME #01FF70
-    vec3(0.667, 0.667, 0.667), // GRAY #AAAAAA
-    vec3(0.867, 0.867, 0.867), // SILVER #DDDDDD
-    vec3(1.000, 1.000, 1.000)  // WHITE #FFFFFF
-);
+uniform vec3 FILL_COLORS[14];
 
 float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVertex) {
     float A = firstVertex.y - secondVertex.y;
