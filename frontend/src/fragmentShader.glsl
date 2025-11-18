@@ -27,15 +27,7 @@ const vec2 HEX_OFFSETS[6] = vec2[](
     vec2(cos(radians(150.0)),  sin(radians(150.0)))  // V5 – lewy‑góra
 );
 
-const vec3 EDGE_COLORS[6] = vec3[](
-    vec3(1.0, 0.0, 0.0),  // 0 czerwony
-    vec3(1.0, 0.5, 0.0),  // 1 pomarańczowy
-    vec3(1.0, 1.0, 0.0),  // 2 żółty
-    vec3(0.0, 1.0, 0.0),  // 3 zielony
-    vec3(0.0, 0.5, 1.0),  // 4 niebieski
-    vec3(0.6, 0.0, 1.0)   // 5 fioletowy
-);
-
+uniform vec3 EDGE_COLORS[6];
 uniform vec3 FILL_COLORS[14];
 
 float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVertex) {
