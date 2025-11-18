@@ -1,37 +1,99 @@
 #version 300 es
 precision highp float;
 
-uniform vec3  u_colorA;  // top color
-uniform vec3  u_colorB;  // bottom color
-
+flat in int v_edgeMask;  // maska krawedzi 
+uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
+flat in int v_fillColorMask;
+flat in int v_vertexID;
 in vec2 v_local;
 out vec4 outColor;
 
-//source : https://iquilezles.org/articles/distfunctions2d/
-float sdHex(vec2 p) {
-    const float s = 1.0 / 0.8660254037844386;
-    p *= s;
-    p = vec2(-p.y, p.x);
-    const vec3 k = vec3(-0.8660254, 0.5, 0.577350269);
-    p = abs(p);
-    float h = dot(k.xy, p);
-    p -= 2.0 * min(h, 0.0) * k.xy;
-    p -= vec2(clamp(p.x, -k.z, k.z), 1.0);
-    float d = length(p) * sign(p.y);
-    return d / s;
+const float cos60 = cos(radians(60.0));
+const float sin60 = sin(radians(60.0));
+const vec3 fillColor = vec3(1.0, 1.0, 1.0);
+
+int getBitAt(int mask, int index) {
+    int shifted = mask >> int(index); // przesuniecie bitowe w prawo
+    int hexSideMaskOn = shifted & 1; // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
+    return int(hexSideMaskOn);
+}
+
+const vec2 HEX_OFFSETS[6] = vec2[](
+    vec2(cos(radians(90.0)),   sin(radians(90.0))),   // V0 – góra
+    vec2(cos(radians(30.0)),   sin(radians(30.0))),   // V1 – prawy‑góra
+    vec2(cos(radians(330.0)),  sin(radians(330.0))),  // V2 – prawy‑dół
+    vec2(cos(radians(270.0)),  sin(radians(270.0))),  // V3 – dół
+    vec2(cos(radians(210.0)),  sin(radians(210.0))),  // V4 – lewy‑dół
+    vec2(cos(radians(150.0)),  sin(radians(150.0)))  // V5 – lewy‑góra
+);
+
+const vec3 EDGE_COLORS[6] = vec3[](
+    vec3(1.0, 0.0, 0.0),  // 0 czerwony
+    vec3(1.0, 0.5, 0.0),  // 1 pomarańczowy
+    vec3(1.0, 1.0, 0.0),  // 2 żółty
+    vec3(0.0, 1.0, 0.0),  // 3 zielony
+    vec3(0.0, 0.5, 1.0),  // 4 niebieski
+    vec3(0.6, 0.0, 1.0)   // 5 fioletowy
+);
+
+uniform vec3 FILL_COLORS[14];
+
+float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVertex) {
+    float A = firstVertex.y - secondVertex.y;
+    float B = secondVertex.x - firstVertex.x;
+    float C = firstVertex.x * secondVertex.y - secondVertex.x * firstVertex.y;
+    return -(A * point.x + B * point.y + C);
+}
+
+int wrapAround(int index){
+    int result = index % 6;
+    result += int(result < 0) * 6;
+    return result;
 }
 
 void main() {
-    float d = sdHex(v_local);
+    vec3 fillColorFirst = FILL_COLORS[v_fillColorMask & 0xF];
+    vec3 fillColorSecond = FILL_COLORS[(v_fillColorMask >> 4) & 0xF];
+    int isVertical = (v_fillColorMask >> 8) & 1;
+    float splitCoord = mix(v_local.y, v_local.x, float(isVertical));
+    float t = step(0.0, splitCoord);
+    vec3 baseFillColor = mix(fillColorFirst, fillColorSecond, t);
 
-    // prosta grubość ramki (jednostki heksa)
-    const float borderWidth = 0.06;
+    int edgeID = wrapAround((v_vertexID - 2));
+    int previousEdgeID = wrapAround((edgeID - 1));
+    int nextEdgeID = wrapAround((edgeID + 1));
 
-    // jeżeli w pasie [0, borderWidth] => zielona ramka
-    bool onBorder = abs(d) <= borderWidth;
+    float distanceCurrent = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[edgeID],
+        HEX_OFFSETS[wrapAround((edgeID + 1))]
+    );
 
-    vec3 fillRGB = (v_local.y >= 0.0) ? u_colorA : u_colorB;
-    vec3 rgb = onBorder ? vec3(0.3, 1.0, 0.8) : fillRGB;
+    float distancePrevious = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[previousEdgeID],
+        HEX_OFFSETS[wrapAround((previousEdgeID + 1))]
+    );
 
-    outColor = vec4(rgb, 1.0);
+    float distanceNext = pointRelativeDistanceFromLine(
+        v_local,
+        HEX_OFFSETS[nextEdgeID],
+        HEX_OFFSETS[wrapAround((nextEdgeID + 1))]
+    );
+
+    int currentSideOn = getBitAt(v_edgeMask, edgeID);
+    int previousSideOn = getBitAt(v_edgeMask, previousEdgeID);
+    int nextSideOn = getBitAt(v_edgeMask, nextEdgeID);
+
+    float currentMask = float(currentSideOn) * step(distanceCurrent, u_borderWidth);
+    float prevMask = float(previousSideOn) * step(distancePrevious, u_borderWidth);
+    float nextMask = float(nextSideOn) * step(distanceNext, u_borderWidth);
+
+    vec3 color =
+    baseFillColor * (1.0 - currentMask) * (1.0 - prevMask) * (1.0 - nextMask) +
+    EDGE_COLORS[nextEdgeID] * nextMask * (1.0 - prevMask) * (1.0 - currentMask) +
+    EDGE_COLORS[previousEdgeID] * prevMask * (1.0 - currentMask) +
+    EDGE_COLORS[edgeID] * currentMask;
+
+    outColor = vec4(color, 1.0);
 }

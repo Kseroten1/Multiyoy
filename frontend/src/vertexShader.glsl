@@ -2,31 +2,32 @@
 precision highp float; 
 
 const vec2 HEX_OFFSETS[8] = vec2[](
-    // center
-    vec2(0.0, 0.0),
-
-    // 6 corners, pointy-top (start at 30°, step 60°)
-    vec2( 0.8660254,  0.5),   // 30°  = (cos 30,  sin 30)
-    vec2( 0.0,        1.0),   // 90°
-    vec2(-0.8660254,  0.5),   // 150°
-    vec2(-0.8660254, -0.5),   // 210°
-    vec2( 0.0,       -1.0),   // 270°
-    vec2( 0.8660254, -0.5),   // 330°
-
-    // repeat first corner to close the fan
-    vec2( 0.8660254,  0.5)
+    vec2(0.0, 0.0),   // V0 (center)
+    vec2(cos(radians(90.0)),   sin(radians(90.0))),   // V1 – góra
+    vec2(cos(radians(30.0)),   sin(radians(30.0))),   // V2 – prawy‑góra
+    vec2(cos(radians(330.0)),  sin(radians(330.0))),  // V3 – prawy‑dół
+    vec2(cos(radians(270.0)),  sin(radians(270.0))),  // V4 – dół
+    vec2(cos(radians(210.0)),  sin(radians(210.0))),  // V5 – lewy‑dół
+    vec2(cos(radians(150.0)),  sin(radians(150.0))),  // V6 – lewy‑góra
+    vec2(cos(radians(90.0)),   sin(radians(90.0)))    // powtórka V1 – domknięcie
 );
 
 uniform mat3 u_mvp;
-uniform vec2 u_center;
-out vec2 v_pos;
+in vec2 u_center;
+in int u_edgeMask;
+in int u_fillColorMask;
+flat out int v_vertexID;
+flat out int v_edgeMask;
+flat out int v_fillColorMask;
 out vec2 v_local;
 
 void main() {
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
+    v_vertexID = gl_VertexID;
+    v_edgeMask = u_edgeMask;
+    v_fillColorMask = u_fillColorMask;
     v_local = localPos;
-    vec2 pos = u_center + localPos;
-    vec3 clipPos = u_mvp * vec3(pos, 1.0);
-    v_pos = clipPos.xy;
+    vec2 modelPos = u_center + localPos;
+    vec3 clipPos = u_mvp * vec3(modelPos, 1.0);
     gl_Position = vec4(clipPos.xy, 0.0, 1.0);
 }
