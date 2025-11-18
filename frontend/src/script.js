@@ -1,6 +1,6 @@
 import vertexShaderString from './vertexShader.glsl?raw'
 import fragmentShaderString from './fragmentShader.glsl?raw'
-import * as culori from 'https://cdn.jsdelivr.net/npm/culori@4.0.2/+esm';
+import * as culori from 'https://cdn.jsdelivr.net/npm/culori@4.0.2/+esm'
 
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2", {
@@ -26,17 +26,14 @@ function compileShader(type, source) {
 const vertShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
 const fragShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
 const program = gl.createProgram();
-
 gl.attachShader(program, vertShader);
 gl.attachShader(program, fragShader);
 gl.linkProgram(program);
-
 if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     const info = gl.getProgramInfoLog(program);
     gl.deleteProgram(program);
     throw new Error('Program link failed: ' + info);
 }
-
 gl.useProgram(program);
 
 const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed
@@ -50,52 +47,66 @@ const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
 const uFillColorMaskLoc = gl.getAttribLocation(program, "u_fillColorMask");
 
 gl.uniform1f(uBorderLoc, 0.1);
-let brightness = 1.0;
-let saturation = 1.0;
-let colorTableHex = [
+const colorTableHex = [
     "#001f3f",
     "#0074D9",
     "#7FDBFF",
     "#39CCCC",
     "#B10DC9",
     "#F012BE",
-    "#85144b",
+    "#85144B",
     "#FF4136",
     "#FF851B",
     "#FFDC00",
     "#3D9970",
     "#2ECC40",
     "#01FF70",
-    "#AAAAAA",
+    "#AAAAAA"
 ];
-let baseOklchColors = colorTableHex.map(h => culori.oklch(culori.rgb(h)));
-function scaledOklchColors(brightnessScale, chromaScale) {
-    return baseOklchColors.map(c => ({
-        mode: 'oklch',
-        l: Math.min(1, c.l * brightnessScale),
-        c: c.c * chromaScale,
-        h: c.h
+const colorTableEdge = [
+    "#ff0000",
+    "#ff8000",
+    "#ffff00",
+    "#00ff00",
+    "#0080ff",
+    "#9900ff"
+];
+
+const baseOklch = {
+    fill: colorTableHex.map((h) => culori.oklch(culori.rgb(h))),
+    edge: colorTableEdge.map((h) => culori.oklch(culori.rgb(h))),
+};
+
+function scaleOklch(colors, bright, chroma) {
+    return colors.map((c) => ({
+        mode: "oklch",
+        l: Math.min(1, c.l * bright),
+        c: c.c * chroma,
+        h: c.h,
     }));
 }
-function oklchToRgbArray(oklch) {
-    const l = Math.pow(Math.min(1, oklch.l), 0.9);
-    const c = oklch.c / (1 + oklch.c) * 2.0;
 
-    const rgb = culori.rgb({ mode: 'oklch', l, c, h: oklch.h }, 'p3');
-    const max = Math.max(rgb.r, rgb.g, rgb.b);
-    const r = Math.max(0, Math.min(1, rgb.r / (max > 1 ? max : 1)));
-    const g = Math.max(0, Math.min(1, rgb.g / (max > 1 ? max : 1)));
-    const b = Math.max(0, Math.min(1, rgb.b / (max > 1 ? max : 1)));
-    return [r, g, b];
+function toRgbArray(oklchColors) {
+    return new Float32Array(
+        oklchColors
+            .map((ok) => {
+                const rgb = culori.rgb(ok, "p3");
+                const max = Math.max(rgb.r, rgb.g, rgb.b, 1);
+                return [rgb.r / max, rgb.g / max, rgb.b / max].map((v) =>
+                    Math.min(1, Math.max(0, v))
+                );
+            })
+            .flat()
+    );
 }
-const uFillColorsLoc = gl.getUniformLocation(program, "FILL_COLORS");
 
-function updateColorTable() {
-    const adjusted = scaledOklchColors(brightness, saturation);
-    const rgbArray = adjusted.map(ok => oklchToRgbArray(ok));
-    const flat = new Float32Array(rgbArray.flat());
+function updateAllColors(brightness, saturation) {
+    const fillRGB = toRgbArray(scaleOklch(baseOklch.fill, brightness, saturation));
+    const edgeRGB = toRgbArray(scaleOklch(baseOklch.edge, brightness, saturation));
+
     gl.useProgram(program);
-    gl.uniform3fv(uFillColorsLoc, flat);
+    gl.uniform3fv(gl.getUniformLocation(program, "FILL_COLORS"), fillRGB);
+    gl.uniform3fv(gl.getUniformLocation(program, "EDGE_COLORS"), edgeRGB);
 }
 
 const backgroundColor = [0.07, 0.07, 0.07, 1]
@@ -164,7 +175,7 @@ function makeModelMat3(pan, scale, angle) {
 function updateUniforms() {
     const modelMat = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, modelMat);
-    updateColorTable();
+    updateAllColors(brightness, saturation);
 }
 
 function makeMask(edgesEnabled) {
@@ -177,7 +188,6 @@ function makeMask(edgesEnabled) {
     }
     return mask;
 }
-
 function makeHexColorMask(color1, color2, isVertical) {
     const orientationBit = isVertical ? 1 : 0;
     return (orientationBit << 8) | (color2 << 4) | color1;
