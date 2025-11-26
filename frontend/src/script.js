@@ -45,6 +45,8 @@ const uCenterLoc = gl.getAttribLocation(program, "u_center");
 const uEdgeMaskLoc = gl.getAttribLocation(program, "u_edgeMask");
 const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
 const uFillColorMaskLoc = gl.getAttribLocation(program, "u_fillColorMask");
+let brightness = 1.0;
+let saturation = 1.0;
 
 gl.uniform1f(uBorderLoc, 0.1);
 const colorTableHex = [
@@ -100,16 +102,39 @@ function toRgbArray(oklchColors) {
     );
 }
 
-function updateAllColors(brightness, saturation) {
-    const fillRGB = toRgbArray(scaleOklch(baseOklch.fill, brightness, saturation));
-    const edgeRGB = toRgbArray(scaleOklch(baseOklch.edge, brightness, saturation));
-
-    gl.useProgram(program);
-    gl.uniform3fv(gl.getUniformLocation(program, "FILL_COLORS"), fillRGB);
-    gl.uniform3fv(gl.getUniformLocation(program, "EDGE_COLORS"), edgeRGB);
+function colorToP3Rgb(color){
+    const x=document.createElement("canvas").getContext(
+        "2d",
+        { colorSpace: "display-p3" }
+    );
+    x.fillStyle=color;
+    x.fillRect(0,0,1,1);
+    const d=x.getImageData(0,0,1,1, {colorSpace: "display-p3", pixelFormat: "rgba-float16"}).data;
+    return [d[0],d[1],d[2]];
 }
 
-const backgroundColor = [0.07, 0.07, 0.07, 1]
+colorToP3Rgb('color(oklch 0.2 1 0)');
+
+function testColorConversion() {
+    const cssColor = "oklch(50% 0.2 40)";
+    const expected = culori.p3(culori.oklch(cssColor)); // <<- referencja
+    const [r, g, b] = colorToP3Rgb(cssColor);
+
+    console.log("Canvas →", r, g, b);
+    console.log("Culori →", expected.r, expected.g, expected.b);
+}
+testColorConversion();
+
+// function updateAllColors(brightness, saturation) {
+//     const fillRGB = toRgbArray(scaleOklch(baseOklch.fill, brightness, saturation));
+//     const edgeRGB = toRgbArray(scaleOklch(baseOklch.edge, brightness, saturation));
+//
+//     gl.useProgram(program);
+//     gl.uniform3fv(gl.getUniformLocation(program, "FILL_COLORS"), fillRGB);
+//     gl.uniform3fv(gl.getUniformLocation(program, "EDGE_COLORS"), edgeRGB);
+//}
+
+const backgroundColor = [...colorToP3Rgb('oklch(30% 0.2 100)'), 1]
 const edgeMasks = [
     [1,1,1,1,1,1],
     [1,1,0,0,0,1],
@@ -175,7 +200,7 @@ function makeModelMat3(pan, scale, angle) {
 function updateUniforms() {
     const modelMat = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, modelMat);
-    updateAllColors(brightness, saturation);
+//    updateAllColors(brightness, saturation);
 }
 
 function makeMask(edgesEnabled) {
