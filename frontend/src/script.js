@@ -1,6 +1,5 @@
 import vertexShaderString from './vertexShader.glsl?raw'
 import fragmentShaderString from './fragmentShader.glsl?raw'
-import * as culori from 'https://cdn.jsdelivr.net/npm/culori@4.0.2/+esm'
 
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2", {
@@ -26,14 +25,17 @@ function compileShader(type, source) {
 const vertShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
 const fragShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
 const program = gl.createProgram();
+
 gl.attachShader(program, vertShader);
 gl.attachShader(program, fragShader);
 gl.linkProgram(program);
+
 if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     const info = gl.getProgramInfoLog(program);
     gl.deleteProgram(program);
     throw new Error('Program link failed: ' + info);
 }
+
 gl.useProgram(program);
 
 const vao = gl.createVertexArray(); //GPU-state object that remembers how your vertex data is provided to the shader, not functional in this implementation, but still needed
@@ -45,96 +47,86 @@ const uCenterLoc = gl.getAttribLocation(program, "u_center");
 const uEdgeMaskLoc = gl.getAttribLocation(program, "u_edgeMask");
 const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
 const uFillColorMaskLoc = gl.getAttribLocation(program, "u_fillColorMask");
-let brightness = 1.0;
-let saturation = 1.0;
 
 gl.uniform1f(uBorderLoc, 0.1);
-const colorTableHex = [
-    "#001f3f",
-    "#0074D9",
-    "#7FDBFF",
-    "#39CCCC",
-    "#B10DC9",
-    "#F012BE",
-    "#85144B",
-    "#FF4136",
-    "#FF851B",
-    "#FFDC00",
-    "#3D9970",
-    "#2ECC40",
-    "#01FF70",
-    "#AAAAAA"
+
+let brightness = 1.0;
+let saturation = 1.0;
+let colorTableHex = [
+    [0.2575, 0.072, 254.83],
+    [0.5398, 0.183, 254.16],
+    [0.7804, 0.099, 228.76],
+    [0.7138, 0.069, 199.93],
+    [0.5092, 0.226, 315.1],
+    [0.6683, 0.228, 320.18],
+    [0.3638, 0.115, 2.33],
+    [0.6116, 0.181, 28.49],
+    [0.7377, 0.173, 62.66],
+    [0.9177, 0.190, 97.52],
+    [0.5217, 0.084, 157.93],
+    [0.7551, 0.146, 142.3],
+    [0.8758, 0.154, 156.62],
+    [0.6886, 0.003, 264.0]
 ];
-const colorTableEdge = [
-    "#ff0000",
-    "#ff8000",
-    "#ffff00",
-    "#00ff00",
-    "#0080ff",
-    "#9900ff"
+let colorTableEdge = [
+    [0.6276, 0.257, 29.23],
+    [0.7042, 0.238, 64.78],
+    [0.9655, 0.220, 101.83],
+    [0.8782, 0.228, 142.19],
+    [0.6246, 0.224, 256.84],
+    [0.5072, 0.259, 300.10]
 ];
 
-const baseOklch = {
-    fill: colorTableHex.map((h) => culori.oklch(culori.rgb(h))),
-    edge: colorTableEdge.map((h) => culori.oklch(culori.rgb(h))),
-};
+const colorConverterCanvas = document.createElement("canvas");
+colorConverterCanvas.height = 1;
+const colorConverterCtx = colorConverterCanvas.getContext("2d", { colorSpace: "display-p3",willReadFrequently: true });
 
-function scaleOklch(colors, bright, chroma) {
-    return colors.map((c) => ({
-        mode: "oklch",
-        l: Math.min(1, c.l * bright),
-        c: c.c * chroma,
-        h: c.h,
-    }));
+function convertOklchToSrgb(colorsOklch){
+    colorConverterCanvas.width = colorsOklch.length;
+    
+    colorsOklch.forEach(([L,C,H], index) => {
+        const oklchString = `oklch(${L} ${C} ${H})`;
+        colorConverterCtx.fillStyle = oklchString;
+        colorConverterCtx.fillRect(index, 0, 1, 1);
+    })
+    
+    const imageData = colorConverterCtx.getImageData(0, 0, colorConverterCanvas.width, 1, {
+        colorSpace: "display-p3",
+        pixelFormat: "rgba-float16"
+    });
+    
+    let data = imageData.data;
+    const sRgbColors = [];
+    for (let i = 0; i < colorsOklch.length; i++) {
+        const index = i * 4;
+        const r = data[index + 0];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        sRgbColors.push([r, g, b]);
+    }
+    return sRgbColors;
 }
 
-function toRgbArray(oklchColors) {
-    return new Float32Array(
-        oklchColors
-            .map((ok) => {
-                const rgb = culori.rgb(ok, "p3");
-                const max = Math.max(rgb.r, rgb.g, rgb.b, 1);
-                return [rgb.r / max, rgb.g / max, rgb.b / max].map((v) =>
-                    Math.min(1, Math.max(0, v))
-                );
-            })
-            .flat()
-    );
+function updateAllColors(brightness, saturation) {
+    gl.useProgram(program);
+    
+    const adjustedFill = colorTableHex.map(([L, C, h]) => [
+        Math.min(L * brightness, 1),
+        C * saturation,
+        h,
+    ]);
+    
+    const adjustedEdge = colorTableEdge.map(([L, C, h]) => [
+        Math.min(L * brightness, 1),
+        C * saturation,
+        h,
+    ]);
+    
+    gl.uniform3fv(gl.getUniformLocation(program, "FILL_COLORS"), new Float32Array(convertOklchToSrgb(adjustedFill).flat()));
+    gl.uniform3fv(gl.getUniformLocation(program, "EDGE_COLORS"), new Float32Array(convertOklchToSrgb(adjustedEdge).flat()));
 }
 
-function colorToP3Rgb(color){
-    const x=document.createElement("canvas").getContext(
-        "2d",
-        { colorSpace: "display-p3" }
-    );
-    x.fillStyle=color;
-    x.fillRect(0,0,1,1);
-    const d=x.getImageData(0,0,1,1, {colorSpace: "display-p3", pixelFormat: "rgba-float16"}).data;
-    return [d[0],d[1],d[2]];
-}
-
-colorToP3Rgb('color(oklch 0.2 1 0)');
-
-function testColorConversion() {
-    const cssColor = "oklch(50% 0.2 40)";
-    const expected = culori.p3(culori.oklch(cssColor)); // <<- referencja
-    const [r, g, b] = colorToP3Rgb(cssColor);
-
-    console.log("Canvas →", r, g, b);
-    console.log("Culori →", expected.r, expected.g, expected.b);
-}
-testColorConversion();
-
-// function updateAllColors(brightness, saturation) {
-//     const fillRGB = toRgbArray(scaleOklch(baseOklch.fill, brightness, saturation));
-//     const edgeRGB = toRgbArray(scaleOklch(baseOklch.edge, brightness, saturation));
-//
-//     gl.useProgram(program);
-//     gl.uniform3fv(gl.getUniformLocation(program, "FILL_COLORS"), fillRGB);
-//     gl.uniform3fv(gl.getUniformLocation(program, "EDGE_COLORS"), edgeRGB);
-//}
-
-const backgroundColor = [...colorToP3Rgb('oklch(30% 0.2 100)'), 1]
+const backgroundColor = [1.0,1.0,1.0, 1]
 const edgeMasks = [
     [1,1,1,1,1,1],
     [1,1,0,0,0,1],
@@ -200,7 +192,7 @@ function makeModelMat3(pan, scale, angle) {
 function updateUniforms() {
     const modelMat = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, modelMat);
-//    updateAllColors(brightness, saturation);
+    updateAllColors(brightness, saturation);
 }
 
 function makeMask(edgesEnabled) {
@@ -259,7 +251,7 @@ function draw() {
     canvas.height = rect.height * window.devicePixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(...backgroundColor);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    //gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(program);
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)
