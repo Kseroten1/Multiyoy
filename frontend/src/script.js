@@ -47,12 +47,14 @@ const uCenterLoc = gl.getAttribLocation(program, "u_center");
 const uEdgeMaskLoc = gl.getAttribLocation(program, "u_edgeMask");
 const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
 const uFillColorMaskLoc = gl.getAttribLocation(program, "u_fillColorMask");
+const uFillColorsLoc = gl.getUniformLocation(program, "FILL_COLORS");
+const uEdgeColorsLoc = gl.getUniformLocation(program, "EDGE_COLORS");
 
 gl.uniform1f(uBorderLoc, 0.1);
 
 let brightness = 1.0;
 let saturation = 1.0;
-let colorTableHex = [
+let colorTableFill = [
     [0.2575, 0.072, 254.83],
     [0.5398, 0.183, 254.16],
     [0.7804, 0.099, 228.76],
@@ -77,40 +79,46 @@ let colorTableEdge = [
     [0.5072, 0.259, 300.10]
 ];
 
-const colorConverterCanvas = document.createElement("canvas");
-colorConverterCanvas.height = 1;
-const colorConverterCtx = colorConverterCanvas.getContext("2d", { colorSpace: "display-p3",willReadFrequently: true });
+//źródło do wzorów
+//https://observablehq.com/@coulterg/oklab-oklch-color-functions
+function convertOklchToSrgb(colorsOklch) {
+    const result = [];
 
-function convertOklchToSrgb(colorsOklch){
-    colorConverterCanvas.width = colorsOklch.length;
-    
-    colorsOklch.forEach(([L,C,H], index) => {
-        const oklchString = `oklch(${L} ${C} ${H})`;
-        colorConverterCtx.fillStyle = oklchString;
-        colorConverterCtx.fillRect(index, 0, 1, 1);
-    })
-    
-    const imageData = colorConverterCtx.getImageData(0, 0, colorConverterCanvas.width, 1, {
-        colorSpace: "display-p3",
-        pixelFormat: "rgba-float16"
-    });
-    
-    let data = imageData.data;
-    const sRgbColors = [];
-    for (let i = 0; i < colorsOklch.length; i++) {
-        const index = i * 4;
-        const r = data[index + 0];
-        const g = data[index + 1];
-        const b = data[index + 2];
-        sRgbColors.push([r, g, b]);
+    for (const [L, C, H] of colorsOklch) {
+        const labL = (H * Math.PI) / 180;
+        const a = Math.cos(labL) * C;
+        const b = Math.sin(labL) * C;
+        
+        const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+        const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+        const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+        const l = l_ ** 3;
+        const m = m_ ** 3;
+        const s = s_ ** 3;
+        
+        let R = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+        let G = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+        let B = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+        
+        R = R <= 0.0031308 ? 12.92 * R : 1.055 * Math.pow(R, 1 / 2.4) - 0.055;
+        G = G <= 0.0031308 ? 12.92 * G : 1.055 * Math.pow(G, 1 / 2.4) - 0.055;
+        B = B <= 0.0031308 ? 12.92 * B : 1.055 * Math.pow(B, 1 / 2.4) - 0.055;
+        
+        result.push([
+            Math.min(Math.max(R, 0), 1),
+            Math.min(Math.max(G, 0), 1),
+            Math.min(Math.max(B, 0), 1),
+        ]);
     }
-    return sRgbColors;
+
+    return result;
 }
 
 function updateAllColors(brightness, saturation) {
     gl.useProgram(program);
     
-    const adjustedFill = colorTableHex.map(([L, C, h]) => [
+    const adjustedFill = colorTableFill.map(([L, C, h]) => [
         Math.min(L * brightness, 1),
         C * saturation,
         h,
@@ -121,9 +129,9 @@ function updateAllColors(brightness, saturation) {
         C * saturation,
         h,
     ]);
-    
-    gl.uniform3fv(gl.getUniformLocation(program, "FILL_COLORS"), new Float32Array(convertOklchToSrgb(adjustedFill).flat()));
-    gl.uniform3fv(gl.getUniformLocation(program, "EDGE_COLORS"), new Float32Array(convertOklchToSrgb(adjustedEdge).flat()));
+
+    gl.uniform3fv(uFillColorsLoc, new Float32Array(convertOklchToSrgb(adjustedFill).flat()));
+    gl.uniform3fv(uEdgeColorsLoc, new Float32Array(convertOklchToSrgb(adjustedEdge).flat()));
 }
 
 const backgroundColor = [1.0,1.0,1.0, 1]
