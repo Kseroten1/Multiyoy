@@ -1,6 +1,7 @@
 import vertexShaderString from './vertexShader.glsl?raw'
 import fragmentShaderString from './fragmentShader.glsl?raw'
-import * as culori from 'https://cdn.jsdelivr.net/npm/culori@4.0.2/+esm';
+import { convertOklchToRgb } from './utils/convertOklchToRgb.js'
+import { updateBrightnessAndSaturationMax } from './utils/updateBrightnessAndSaturationMax.js'
 
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2", {
@@ -48,57 +49,66 @@ const uCenterLoc = gl.getAttribLocation(program, "u_center");
 const uEdgeMaskLoc = gl.getAttribLocation(program, "u_edgeMask");
 const uBorderLoc = gl.getUniformLocation(program, "u_borderWidth");
 const uFillColorMaskLoc = gl.getAttribLocation(program, "u_fillColorMask");
+const uFillColorsLoc = gl.getUniformLocation(program, "FILL_COLORS");
+const uEdgeColorsLoc = gl.getUniformLocation(program, "EDGE_COLORS");
 
 gl.uniform1f(uBorderLoc, 0.1);
+
 let brightness = 1.0;
 let saturation = 1.0;
-let colorTableHex = [
-    "#001f3f",
-    "#0074D9",
-    "#7FDBFF",
-    "#39CCCC",
-    "#B10DC9",
-    "#F012BE",
-    "#85144b",
-    "#FF4136",
-    "#FF851B",
-    "#FFDC00",
-    "#3D9970",
-    "#2ECC40",
-    "#01FF70",
-    "#AAAAAA",
+const colorTableFill = [
+    [0.2575, 0.072, 254.83],
+    [0.5398, 0.183, 254.16],
+    [0.7804, 0.099, 228.76],
+    [0.7138, 0.069, 199.93],
+    [0.5092, 0.226, 315.1],
+    [0.6683, 0.228, 320.18],
+    [0.3638, 0.115, 2.33],
+    [0.6116, 0.181, 28.49],
+    [0.7377, 0.173, 62.66],
+    [0.9177, 0.190, 97.52],
+    [0.5217, 0.084, 157.93],
+    [0.7551, 0.146, 142.3],
+    [0.8758, 0.154, 156.62],
+    [0.6886, 0.003, 264.0]
 ];
-let baseOklchColors = colorTableHex.map(h => culori.oklch(culori.rgb(h)));
-function scaledOklchColors(brightnessScale, chromaScale) {
-    return baseOklchColors.map(c => ({
-        mode: 'oklch',
-        l: Math.min(1, c.l * brightnessScale),
-        c: c.c * chromaScale,
-        h: c.h
-    }));
-}
-function oklchToRgbArray(oklch) {
-    const l = Math.pow(Math.min(1, oklch.l), 0.9);
-    const c = oklch.c / (1 + oklch.c) * 2.0;
+const colorTableEdge = [
+    [0.6276, 0.257, 29.23],
+    [0.7042, 0.238, 64.78],
+    [0.9655, 0.220, 101.83],
+    [0.8782, 0.228, 142.19],
+    [0.6246, 0.224, 256.84],
+    [0.5072, 0.259, 300.10]
+];
 
-    const rgb = culori.rgb({ mode: 'oklch', l, c, h: oklch.h }, 'p3');
-    const max = Math.max(rgb.r, rgb.g, rgb.b);
-    const r = Math.max(0, Math.min(1, rgb.r / (max > 1 ? max : 1)));
-    const g = Math.max(0, Math.min(1, rgb.g / (max > 1 ? max : 1)));
-    const b = Math.max(0, Math.min(1, rgb.b / (max > 1 ? max : 1)));
-    return [r, g, b];
-}
-const uFillColorsLoc = gl.getUniformLocation(program, "FILL_COLORS");
-
-function updateColorTable() {
-    const adjusted = scaledOklchColors(brightness, saturation);
-    const rgbArray = adjusted.map(ok => oklchToRgbArray(ok));
-    const flat = new Float32Array(rgbArray.flat());
+function updateAllColors(brightness, saturation) {
     gl.useProgram(program);
-    gl.uniform3fv(uFillColorsLoc, flat);
+    
+    const adjustedFill = colorTableFill.map(([L, C, h]) => [
+        Math.min(L * brightness, 1),
+        C * saturation,
+        h,
+    ]);
+    
+    const adjustedEdge = colorTableEdge.map(([L, C, h]) => [
+        Math.min(L * brightness, 1),
+        C * saturation,
+        h,
+    ]);
+
+    gl.uniform3fv(uFillColorsLoc, new Float32Array(convertOklchToRgb(adjustedFill).flat()));
+    gl.uniform3fv(uEdgeColorsLoc, new Float32Array(convertOklchToRgb(adjustedEdge).flat()));
 }
 
-const backgroundColor = [0.07, 0.07, 0.07, 1]
+const brightnessInput = document.getElementById("brightness");
+const saturationInput = document.getElementById("saturation");
+
+const [maxBrightness, maxSaturation] = updateBrightnessAndSaturationMax(colorTableFill);
+
+brightnessInput.max = maxBrightness;
+saturationInput.max = maxSaturation;
+
+const backgroundColor = [1.0,1.0,1.0, 1]
 const edgeMasks = [
     [1,1,1,1,1,1],
     [1,1,0,0,0,1],
@@ -138,7 +148,7 @@ function generateAxialHexCenters(radius, size) {
 const centers = generateAxialHexCenters(600, 1.0);
 
 let panOffset = { x: 0.0, y: 0.0 };
-let scale = 1.0;
+let scale = 0.2;
 let angle = 0.0;
 
 function makeModelMat3(pan, scale, angle) {
@@ -164,7 +174,7 @@ function makeModelMat3(pan, scale, angle) {
 function updateUniforms() {
     const modelMat = makeModelMat3(panOffset, scale, angle);
     gl.uniformMatrix3fv(uMvpLoc, false, modelMat);
-    updateColorTable();
+    updateAllColors(brightness, saturation);
 }
 
 function makeMask(edgesEnabled) {
@@ -177,7 +187,6 @@ function makeMask(edgesEnabled) {
     }
     return mask;
 }
-
 function makeHexColorMask(color1, color2, isVertical) {
     const orientationBit = isVertical ? 1 : 0;
     return (orientationBit << 8) | (color2 << 4) | color1;
@@ -224,7 +233,7 @@ function draw() {
     canvas.height = rect.height * window.devicePixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(...backgroundColor);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    //gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(program);
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)

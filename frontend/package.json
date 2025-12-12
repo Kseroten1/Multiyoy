@@ -9,6 +9,7 @@
     "preview": "bunx vite preview"
   },
   "devDependencies": {
-    "vite": "^7.1.4"
+    "vite": "^7.1.4",
+    "vitest": "^4.0.15"
   }
 }
