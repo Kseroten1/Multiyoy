@@ -1,5 +1,6 @@
 import vertexShaderString from './vertexShader.glsl?raw'
 import fragmentShaderString from './fragmentShader.glsl?raw'
+import { convertOklchToSrgb } from './utils/convertOklchToSrgb.js'
 
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2", {
@@ -79,42 +80,6 @@ let colorTableEdge = [
     [0.5072, 0.259, 300.10]
 ];
 
-//źródło do wzorów
-//https://observablehq.com/@coulterg/oklab-oklch-color-functions
-function convertOklchToSrgb(colorsOklch) {
-    const result = [];
-
-    for (const [L, C, H] of colorsOklch) {
-        const labL = (H * Math.PI) / 180;
-        const a = Math.cos(labL) * C;
-        const b = Math.sin(labL) * C;
-        
-        const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-        const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-        const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
-
-        const l = l_ ** 3;
-        const m = m_ ** 3;
-        const s = s_ ** 3;
-        
-        let R = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-        let G = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-        let B = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
-        
-        R = R <= 0.0031308 ? 12.92 * R : 1.055 * Math.pow(R, 1 / 2.4) - 0.055;
-        G = G <= 0.0031308 ? 12.92 * G : 1.055 * Math.pow(G, 1 / 2.4) - 0.055;
-        B = B <= 0.0031308 ? 12.92 * B : 1.055 * Math.pow(B, 1 / 2.4) - 0.055;
-        
-        result.push([
-            Math.min(Math.max(R, 0), 1),
-            Math.min(Math.max(G, 0), 1),
-            Math.min(Math.max(B, 0), 1),
-        ]);
-    }
-
-    return result;
-}
-
 function updateAllColors(brightness, saturation) {
     gl.useProgram(program);
     
@@ -132,6 +97,23 @@ function updateAllColors(brightness, saturation) {
 
     gl.uniform3fv(uFillColorsLoc, new Float32Array(convertOklchToSrgb(adjustedFill).flat()));
     gl.uniform3fv(uEdgeColorsLoc, new Float32Array(convertOklchToSrgb(adjustedEdge).flat()));
+}
+
+function updateBrighntessAndSaturationMax() {
+    const L_Values = colorTableFill.map(([L]) => L);
+    const C_Values = colorTableFill.map(([_, C]) => C);
+    
+    const maxL = Math.max(...L_Values);
+    const maxC = Math.max(...C_Values);
+
+    const maxBrightness = (1 / maxL).toFixed(2);
+    const maxSaturation = Math.min(0.4 / maxC, 1.8).toFixed(2);
+
+    const brightnessInput = document.getElementById("brightness");
+    const saturationInput = document.getElementById("saturation");
+
+    brightnessInput.max = maxBrightness;
+    saturationInput.max = maxSaturation;
 }
 
 const backgroundColor = [1.0,1.0,1.0, 1]
@@ -269,6 +251,7 @@ function draw() {
 }
 
 draw(); // initial draw
+updateBrighntessAndSaturationMax();
 
 let dragging = false; //needed for logic of 'dragging' the hexagon
 let lastX = 0.0;
