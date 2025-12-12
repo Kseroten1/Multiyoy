@@ -1,8 +1,8 @@
-// Converts an array of OKLCH colors to sRGB.
+// Converts an array of OKLCH colors to RGB.
 // Each input color is [L, C, H]. Returns array of [r, g, b] in 0–1 range.
 //źródło do wzorów
 //https://observablehq.com/@coulterg/oklab-oklch-color-functions
-export function convertOklchToSrgb (colorsOklch) {
+export function convertOklchToRgb (colorsOklch) {
     const result = [];
 
     for (const [L, C, H] of colorsOklch) {

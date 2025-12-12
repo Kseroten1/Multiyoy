@@ -1,6 +1,7 @@
 import vertexShaderString from './vertexShader.glsl?raw'
 import fragmentShaderString from './fragmentShader.glsl?raw'
-import { convertOklchToSrgb } from './utils/convertOklchToSrgb.js'
+import { convertOklchToRgb } from './utils/convertOklchToRgb.js'
+import { updateBrightnessAndSaturationMax } from './utils/updateBrightnessAndSaturationMax.js'
 
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2", {
@@ -55,7 +56,7 @@ gl.uniform1f(uBorderLoc, 0.1);
 
 let brightness = 1.0;
 let saturation = 1.0;
-let colorTableFill = [
+const colorTableFill = [
     [0.2575, 0.072, 254.83],
     [0.5398, 0.183, 254.16],
     [0.7804, 0.099, 228.76],
@@ -71,7 +72,7 @@ let colorTableFill = [
     [0.8758, 0.154, 156.62],
     [0.6886, 0.003, 264.0]
 ];
-let colorTableEdge = [
+const colorTableEdge = [
     [0.6276, 0.257, 29.23],
     [0.7042, 0.238, 64.78],
     [0.9655, 0.220, 101.83],
@@ -95,26 +96,17 @@ function updateAllColors(brightness, saturation) {
         h,
     ]);
 
-    gl.uniform3fv(uFillColorsLoc, new Float32Array(convertOklchToSrgb(adjustedFill).flat()));
-    gl.uniform3fv(uEdgeColorsLoc, new Float32Array(convertOklchToSrgb(adjustedEdge).flat()));
+    gl.uniform3fv(uFillColorsLoc, new Float32Array(convertOklchToRgb(adjustedFill).flat()));
+    gl.uniform3fv(uEdgeColorsLoc, new Float32Array(convertOklchToRgb(adjustedEdge).flat()));
 }
 
-function updateBrighntessAndSaturationMax() {
-    const L_Values = colorTableFill.map(([L]) => L);
-    const C_Values = colorTableFill.map(([_, C]) => C);
-    
-    const maxL = Math.max(...L_Values);
-    const maxC = Math.max(...C_Values);
+const brightnessInput = document.getElementById("brightness");
+const saturationInput = document.getElementById("saturation");
 
-    const maxBrightness = (1 / maxL).toFixed(2);
-    const maxSaturation = Math.min(0.4 / maxC, 1.8).toFixed(2);
+const [maxBrightness, maxSaturation] = updateBrightnessAndSaturationMax(colorTableFill);
 
-    const brightnessInput = document.getElementById("brightness");
-    const saturationInput = document.getElementById("saturation");
-
-    brightnessInput.max = maxBrightness;
-    saturationInput.max = maxSaturation;
-}
+brightnessInput.max = maxBrightness;
+saturationInput.max = maxSaturation;
 
 const backgroundColor = [1.0,1.0,1.0, 1]
 const edgeMasks = [
@@ -251,7 +243,6 @@ function draw() {
 }
 
 draw(); // initial draw
-updateBrighntessAndSaturationMax();
 
 let dragging = false; //needed for logic of 'dragging' the hexagon
 let lastX = 0.0;
