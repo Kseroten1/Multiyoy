@@ -1,0 +1,76 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This is a sample header for a sample dissertation. Fill in the name,
+% and the other information. LaTeX will work out the table of
+% content, the list of figures and of tables for you.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+\thispagestyle{empty}
+
+% ******* Title page *******
+% **************************
+
+\begin{onehalfspacing}
+    \begin{center}
+
+        \centering
+        \includegraphics[keepaspectratio,scale=1.1]{./figures/logoAmw.jpg} \\[.5cm]
+
+
+        {\fontsize{17}{17}\selectfont
+        \textsc{\textbf{Akademia Marynarki Wojennej \\[.25cm]
+        im. Bohaterów Westerplatte  \\[.25cm]
+        Wydział Mechaniczno- Elektryczny } \\[.25cm]
+        {Praca inżynierska\\[1.7cm]}} %%%%%%%%%%%%%%% TUTAJ ZMIEŃ 
+
+
+
+
+        \large
+        Projekt i implementacja aplikacji rozrywkowej na podstawie gry \textit{Slay} \\[2.3cm] %%%%%%%%%%%%%%% TUTAJ ZMIEŃ %%%%%%%%%%%%%%%
+% Jeśli tytuł pracy zajmuje 2 linijki, wartość [2.3cm] zamieniamy na [3.1cm], jeśli tylko jedną - na [3.9cm] i odwrotnie - zwiększając liczbę linijek o jedną (do czterech) zmieniamy na [1.5cm] itd.
+
+        \large
+            \begin{flushleft}
+                Wykonawca: Damian Klein  \\ %%%%%%%%%%%%%%% TUTAJ ZMIEŃ 
+            \end{flushleft}
+
+
+            \sidebyside[0.45][0.45]{Kierownik pracy }{Kierownik Katedry}
+            \sidebyside[0.45][0.45]{Dr. Inż. Jan Masiejczyk}{\textcolor{green}{ Wpisać stopień, imię i nazwisko kierownika katedry}}
+            \vspace{1cm}
+
+            \begin{tabular}{c c c}
+                \multicolumn{3}{l}{Konsultant: \textcolor{blue}{Wpisać stopień, imię i nazwisko konsultanta}} \\
+                Ocena pracy dyplomowej   &  .......................... & .......................... \\
+                \textcolor{white}{a} & \footnotesize słownie & \footnotesize data i podpis \\
+                & & \footnotesize Przewodniczącego Komisji Egzaminacyjnej
+            \end{tabular}
+
+            \vspace{3cm}
+        }
+    \end{center}
+\end{onehalfspacing}
+
+\singlespacing
+\newpage
+%\thispagestyle{empty}
+\input{Rozdzialy/oswiadczenie}
+\mbox{}
+
+\doublespacing
+\newpage
+\thispagestyle{empty}
+\mbox{}
+
+%\pagestyle{empty}
+\pagenumbering{Roman}
+\setcounter{page}{0} \pagestyle{plain}
+
+
+\tableofcontents
+
+\newpage
+\input{Rozdzialy/oznaczenia}
+
+\pagestyle{fancy}
