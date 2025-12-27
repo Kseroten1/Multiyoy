@@ -1,0 +1,189 @@
+\documentclass[oneside,a4paper,12pt]{report} %,draft,openright
+
+\usepackage[polish]{babel}
+\usepackage{polski}
+\usepackage{ragged2e}
+\usepackage{blindtext}
+\usepackage[utf8]{inputenc} 
+\usepackage{gensymb}
+\usepackage{graphicx}
+\graphicspath{ {images/} }
+\usepackage{epsf,graphicx}
+%\usepackage{subfigure}
+\usepackage{latexsym,amssymb}
+\usepackage{setspace,cite}
+\usepackage{indentfirst}
+\usepackage{mathtools}
+\usepackage[justification=centering]{caption}
+\usepackage{multirow}
+\usepackage[figuresright]{rotating}
+\usepackage{enumitem}
+\usepackage{xparse}
+\usepackage{tabularx}
+\usepackage[normalem]{ulem} 
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amssymb} % for \longrightarrow
+\usepackage[T1]{fontenc} % for \symbol{92} 
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\makeatletter
+\newcommand{\unchapter}[1]{%
+  \begingroup
+  \let\@makechapterhead\@gobble % make \@makechapterhead do nothing
+  \chapter{#1}
+  \endgroup
+}
+\makeatother
+
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries}{}{0pt}{\Huge}
+\pagestyle{headings}
+
+\NewDocumentEnvironment{sidebyside}{O{1.50} o +m +m}{%
+  \noindent\begin{minipage}[t][][t]{#1\linewidth}%
+  #3% Content of the first minipage
+  \end{minipage}%
+  \hfill%
+  \noindent\begin{minipage}[t][][t]{\IfValueTF{#2}{#2}{#1}\linewidth}%
+  #4% Content of the second minipage
+  \end{minipage}\\% newline is important, it allows \hfill to work correctly, try removing it ;)
+}
+
+\usepackage[usenames, dvipsnames]{color}
+% for margins left, right top bottom
+\usepackage{anysize}
+\marginsize{3cm}{3cm}{0.5cm}{1cm}
+\let\origdoublepage\cleardoublepage    %%komenda wstawiająca czyste kartki
+\newcommand{\clearemptydoublepage}{%
+  \clearpage
+  {\pagestyle{empty}\origdoublepage}%
+}
+\let\cleardoublepage\clearemptydoublepage
+
+%\usepackage{draft} %draft option - doesn't put full figures in -
+            % useful when editing
+
+%does the headers on the pages - keep in
+\usepackage{fancyhdr}
+%omitting any of these makes the thesis compile without the omitted
+%chapter - good for editing single chapters.
+%\includeonly{header,appendix}
+\usepackage{xcolor}
+\usepackage{listings}
+
+% Kolory dla kodu
+\definecolor{codegray}{rgb}{0.9,0.9,0.9}
+\definecolor{commentgreen}{rgb}{0.25, 0.5, 0.35}
+\definecolor{keywordblue}{rgb}{0.1, 0.1, 0.9}
+\definecolor{stringpurple}{rgb}{0.6, 0.0, 0.6}
+\definecolor{numberorange}{rgb}{0.9, 0.4, 0.0}
+
+% Główny styl dla kodów
+\lstdefinestyle{mycodestyle}{
+    backgroundcolor=\color{codegray},
+    commentstyle=\color{commentgreen}\itshape,
+    keywordstyle=\color{keywordblue}\bfseries,
+    stringstyle=\color{stringpurple},
+    numberstyle=\tiny\color{numberorange},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    tabsize=2,
+    showstringspaces=false,
+    numbers=left,
+    numbersep=5pt,
+    xleftmargin=1em,
+    framexleftmargin=1em,
+}
+
+% JavaScript i GLSL traktujemy jako podobny język (użyjemy js)
+\lstdefinelanguage{GLSL}{
+  keywords={in, out, uniform, layout, float, vec2, vec3, vec4, mat3, mat4, if, else, for, while, return, true, false, const},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+}
+
+% Aktywujemy nasz styl jako domyślny
+\lstset{style=mycodestyle}
+% Definicja języka JavaScript dla listings
+\lstdefinelanguage{JavaScript}{
+  keywords={const, var, let, function, if, else, for, while, return, class, new, try, catch, import, from, export, default, true, false, null, undefined},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+  morestring=[b]`,
+}
+\lstset{literate=
+  {ą}{{\k{a}}}1 {ć}{{\'c}}1 {ę}{{\k{e}}}1 {ł}{{\l{}}}1
+  {ń}{{\'n}}1 {ó}{{\'o}}1 {ś}{{\'s}}1 {ż}{{\.z}}1 {ź}{{\'z}}1
+  {Ą}{{\k{A}}}1 {Ć}{{\'C}}1 {Ę}{{\k{E}}}1 {Ł}{{\L{}}}1
+  {Ń}{{\'N}}1 {Ó}{{\'O}}1 {Ś}{{\'S}}1 {Ż}{{\.Z}}1 {Ź}{{\'Z}}1
+}
+\begin{document}
+\newpage
+%Puts page numbering of preamble in roman and of main body of thesis in
+%arabic. Also defines how chapters and sections are made
+\pagenumbering{arabic}
+\setcounter{page}{1} \pagestyle{fancy}
+\renewcommand{\chaptermark}[1]{\markboth{\chaptername%
+\ \thechapter:\,\ #1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\,\ #1}}
+%DEFINES TITLE PAGE, and contains abstract, acknowledgements, etc.
+\include{header}
+\newpage
+%sets up headers for lefthand and righthand pages. To alter, edit
+%these lines and the chaptermark/sectionmark lines above
+%\addtolength{\headheight}{3pt} \fancyhead{}
+%\fancyhead[LE]{\sl\leftmark} \fancyhead[LO,RE]{\rm\thepage}
+%\fancyhead[RO]{\sl\rightmark} \fancyfoot[C,L,E]{}
+\pagenumbering{arabic}
+\fancyhead[LE,RO]{\slshape \rightmark}
+\fancyhead[LO,RE]{\slshape \leftmark}
+\fancyfoot[C]{\thepage}
+\setlength{\parskip}{1ex} %odstępy między akapitami
+%\singlespacing
+%\doublespacing
+\onehalfspacing
+\newpage
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%% TUTAJ ZMIEŃ %%%%%%%%%%%%%%%
+%%%%%%%%%%%%%% ROZDZIAŁY - zmień nazwy %%%%%%%%%%%%%%%%%%%%%
+
+
+\addcontentsline{toc}{chapter}{Wstęp}
+\chapter{Rozdział 1}
+\input{Rozdzialy/rozdzial1}
+\chapter{Rozdział 2}
+\input{Rozdzialy/rozdzial2}
+\chapter{Rozdział 3}
+\input{Rozdzialy/rozdzial3}
+\chapter{Podsumowanie}
+\input{Rozdzialy/rozdzial4}
+\addcontentsline{toc}{chapter}{Załączniki}
+\chapter*{Załączniki}
+\input{Rozdzialy/zalaczniki}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+%   this is for BibTeX.  remove if you plan to write the references in the document
+\bibliographystyle{plplain}
+\bibliography{bibliografia}
+
+\addcontentsline{toc}{chapter}
+         {\protect\numberline{Bibliografia\hspace{-96pt}}}
+%streszczenie
+    \addcontentsline{toc}{chapter}{Streszczenie}
+    \chapter*{}
+\input{Rozdzialy/streszczenie}
+
+\end{document}

@@ -1,0 +1,147 @@
+\newpage
+\section{Tworzenie shaderów}
+
+\subsection{Wprowadzenie do shaderów}
+
+Współczesne silniki renderujące oraz biblioteki graficzne, takie jak \textit{WebGL}, \textit{OpenGL} czy \textit{Vulkan}, opierają się na koncepcji programowalnego procesu renderowania.
+Tradycyjnie jego zadaniem było przetwarzanie wierzchołków modeli 3D oraz rasteryzacja geometrii na piksele.
+Dzięki zastosowaniu tzw. \textit{shaderów} --- niewielkich programów wykonywanych bezpośrednio na karcie graficznej --- możliwe stało się pełne kontrolowanie sposobu, w jaki dane obiekty są rysowane i oświetlane.
+
+Shader jest programem, który przetwarza dane wejściowe przekazywane z aplikacji (zazwyczaj wierzchołki, kolory, tekstury lub parametry transformacji) i generuje dane wyjściowe odpowiadające za wygląd obrazu widzianego na ekranie.
+W praktyce pozwala to na realizację dowolnych efektów wizualnych --- od prostych zmian koloru, po zaawansowane efekty świetlne, przezroczystości czy symulacje fizyczne w grafice.
+
+W ramach projektu \textit{Multiyoy} zastosowano proces renderowania oparty na dwóch typach shaderów:
+\begin{itemize}
+    \item \textbf{Vertex shader} --- odpowiedzialny za przetwarzanie współrzędnych wierzchołków geometrycznych.
+    W projekcie został wykorzystany do generowania pozycji sześciokątów (heksagonów) na mapie oraz obliczeń transformacji przestrzennych.
+    \item \textbf{Fragment shader} --- przetwarza każdy piksel (fragment) obrazu.
+    W projekcie jego zadaniem jest obliczanie koloru poszczególnych obszarów heksagonu, w tym krawędzi i wewnętrznej części pola.
+\end{itemize}
+
+Projekt wykorzystuje najnowszy standard \textbf{WebGL 2.0}, który wspiera język \textbf{GLSL ES 3.00}, umożliwiający pisanie shaderów o złożonej logice i obsługujących typy całkowite oraz tablice struktur.
+Takie podejście pozwoliło na stworzenie w pełni programowalnego systemu renderującego, który nie wymaga ręcznego definiowania wszystkich wierzchołków w kodzie aplikacji --- geometrię heksagonu generuje bezpośrednio shader, a wiele jego instancji jest renderowanych w jednym wywołaniu funkcji przy użyciu mechanizmu \textit{instancjonowania}.
+
+Implementacja shaderów w projekcie nie tylko umożliwiła wydajne renderowanie dużych siatek heksagonów,
+ale również zapewniła elastyczność podczas tworzenia efektów graficznych, takich jak manipulacja jasnością, nasyceniem czy kolorem krawędzi.
+Zastosowanie tej technologii stanowi podstawę całego systemu wizualnego gry i było kluczowym elementem realizacji założonych celów projektowych.
+
+\subsection{Architektura systemu shaderów}
+
+Implementacja shaderów w projekcie \textit{Multiyoy} została zrealizowana z wykorzystaniem technologii \textbf{WebGL 2.0},
+umożliwiającej bezpośredni dostęp do sprzętowego procesu renderowania w przeglądarce.
+Architektura systemu shaderów została zaprojektowana w sposób modularny, co pozwala na łatwe modyfikowanie i rozbudowę efektów graficznych bez ingerencji w główną logikę gry.
+
+Aplikacja inicjuje kontekst graficzny poprzez obiekt \texttt{WebGL2RenderingContext}, który jest tworzony na elemencie \texttt{canvas}.
+W momencie uruchomienia programu ładowane są dwa zewnętrzne pliki: \texttt{vertexShader.glsl} oraz \texttt{fragmentShader.glsl}.
+Są one importowane w postaci surowych ciągów tekstowych (\texttt{?raw}) i przekazywane do dedykowanej funkcji kompilującej shadery:
+
+\begin{lstlisting}[language=JavaScript, caption={Kompilacja i linkowanie shaderów w WebGL}]
+const vertShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+const fragShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+gl.attachShader(program, vertShader);
+gl.attachShader(program, fragShader);
+gl.linkProgram(program);
+\end{lstlisting}
+
+Każdy shader jest kompilowany niezależnie, a następnie łączony w jeden program graficzny przy pomocy \texttt{gl.linkProgram(program)}.
+W przypadku błędu kompilacji lub linkowania program zatrzymuje działanie i wypisuje odpowiednią informację diagnostyczną.
+Takie podejście zapewnia pełną kontrolę nad procesem budowania programu GPU oraz pozwala łatwo wykrywać błędy syntaktyczne na wczesnym etapie.
+
+Po pomyślnym połączeniu shaderów tworzony jest obiekt \texttt{Vertex Array Object (VAO)},
+który wiąże wszystkie atrybuty wierzchołków oraz uniformy z programem graficznym.
+W projekcie \textit{Multiyoy} do shaderów przekazywane są między innymi następujące dane:
+\begin{itemize}
+    \item \textbf{u\_mvp} — macierz transformacji 2D (macierz typu \texttt{mat3}), odpowiedzialna za skalowanie, obrót i przesunięcie heksagonów na ekranie,
+    \item \textbf{u\_center} — pozycja środka każdego heksagonu, przekazywana jako atrybut wierzchołka,
+    \item \textbf{u\_edgeMask} — maska bitowa opisująca, które krawędzie heksagonu mają zostać narysowane,
+    \item \textbf{u\_fillColorMask} — maska definiująca sposób podziału kolorów oraz orientację (wertykalną lub horyzontalną),
+    \item \textbf{FILL\_COLORS} oraz \textbf{EDGE\_COLORS} — tablice kolorów zapisane w postaci uniformów, wykorzystywane do wypełnienia i krawędzi.
+\end{itemize}
+
+Przekazywanie danych odbywa się przy użyciu buforów tablicowych (\texttt{ARRAY\_BUFFER}) tworzonych po stronie GPU.
+Dla każdego heksagonu aplikacja generuje pozycję w układzie współrzędnych typu \textit{Axial},
+a następnie umieszcza ją w buforze za pomocą:
+
+\begin{lstlisting}[language=JavaScript, caption={Przekazanie danych do bufora GPU}]
+gl.bufferData(gl.ARRAY_BUFFER, centerData, gl.STATIC_DRAW);
+\end{lstlisting}
+
+Dzięki temu możliwe jest renderowanie tysięcy instancji w jednym wywołaniu:
+
+\begin{lstlisting}[language=JavaScript, caption={Renderowanie instancjonowane hexagonów}]
+gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, centers.length);
+\end{lstlisting}
+
+Mechanizm \textbf{instancjonowania} pozwala na znaczną redukcję kosztów obliczeniowych,
+ponieważ współdzielona geometria heksagonu jest przetwarzana tylko raz,
+a każdy kolejny heksagon korzysta z tych samych danych wierzchołków, różniąc się jedynie pozycją i kolorem.
+Wszystkie transformacje położenia i skali są wykonywane w \textit{vertex shaderze}, natomiast kolory oraz renderowanie krawędzi są realizowane w \textit{fragment shaderze}.
+
+Cały system shaderów został zaprojektowany jako elastyczny moduł,
+który można rozbudowywać o kolejne efekty, takie jak dynamiczne cieniowanie, podświetlenia czy wizualne zaznaczenia pól.
+Dzięki oddzieleniu logiki renderowania od logiki gry, architektura zachowuje spójność,
+a modyfikacje wyglądu nie wpływają na mechanikę rozgrywki.
+W praktyce taka konstrukcja umożliwia szybkie eksperymenty z kolorystyką, grubością krawędzi czy trybami prezentacji mapy,
+bez konieczności przebudowy całego systemu graficznego.
+
+\subsection{Etapy rozwoju shaderów}
+
+Prace nad systemem shaderów rozpoczęły się od prostych ćwiczeń mających na celu zrozumienie przepływu danych pomiędzy procesorem a kartą graficzną oraz poznanie zasad działania \textit{WebGL 2.0}.
+Pierwsze próby polegały na rysowaniu trójkątów i kwadratów przy użyciu tablic wierzchołków oraz bufora indeksów.
+Na tym etapie poznano mechanizmy interpolacji kolorów w shaderze fragmentów i wprowadzono obsługę podstawowych transformacji figur.
+Uzyskane doświadczenia pozwoliły zbudować prosty, lecz w pełni funkcjonalny system rysowania kształtów w przeglądarce.
+
+Kolejnym krokiem było generowanie geometrii przybliżonego koła.
+Figura została utworzona w trybie \texttt{gl.TRIANGLE\_FAN}, gdzie współrzędne wierzchołków obliczano z użyciem funkcji trygonometrycznych.
+W dalszym etapie część obliczeń przeniesiono do \textit{vertex shadera}, który samodzielnie wyznaczał położenie punktów okręgu.
+Dzięki temu zredukowano ilość danych przesyłanych pomiędzy CPU a GPU oraz zoptymalizowano proces renderowania.
+Dodatkowo wprowadzono macierz transformacji \texttt{u\_mvp}, która umożliwiła skalowanie, obracanie i przesuwanie figury oraz interaktywną obsługę myszy i kółka przewijania.
+
+Po opanowaniu geometrii przystąpiono do rysowania pojedynczego heksagonu — podstawowej jednostki mapy.
+Współrzędne jego wierzchołków generowano matematycznie bezpośrednio w shaderze,
+a \textit{fragment shader} nadawał jednolity kolor przekazywany jako uniform.
+Następnie rozszerzono projekt o możliwość obrysowywania krawędzi poprzez wyznaczanie odległości poszczególnych pikseli od linii brzegowych.
+Ten etap, mimo swojej pozornej prostoty, okazał się najbardziej czasochłonny i wymagał dopracowania wielu detali matematycznych.
+
+W dalszej części projektu wprowadzono tzw. maski krawędziowe, pozwalające włączać i wyłączać konkretne krawędzie heksagonu.
+Dzięki maskom bitowym udało się wyeliminować podwójne obramowania na stykach pól i znacznie poprawić czytelność mapy.
+Kolejnym krokiem było dodanie podziału kolorystycznego na dwie części — pionową lub poziomą — co pozwoliło tworzyć setki unikalnych kombinacji barw dla wielu graczy na rozległych mapach.
+
+Po przygotowaniu warstwy wizualnej skupiono się na wydajności.
+Zamiast rysować każdy heksagon osobno, zastosowano instancjonowanie, co pozwoliło renderować całą mapę – setki tysięcy heksagonów – w jednym wywołaniu funkcji \texttt{drawArraysInstanced}.
+Dzięki temu wykonywanie obliczeń przeniesiono niemal w całości na GPU, a liczba klatek na sekundę pozostała stabilna nawet przy bardzo dużych mapach.
+Układ współrzędnych Axial umożliwił przy tym logiczne rozmieszczenie heksagonów bez potrzeby przechowywania ich pozycji w pamięci w sposób nieuporządkowany.
+
+W późniejszym etapie wprowadzono globalny system kolorów.
+Każdy heksagon przestał przechowywać własne wartości RGB i zamiast tego korzystał z indeksów wskazujących pozycję w tablicach \texttt{FILL\_COLORS} i \texttt{EDGE\_COLORS}.
+Zastosowanie uniformów dla palet kolorystycznych znacząco obniżyło liczbę danych przesyłanych z procesora i uprościło zarządzanie wyglądem mapy.
+Całość była renderowana w przestrzeni barw OKLCH, która zapewniała lepsze odwzorowanie percepcyjne kolorów niż tradycyjny RGB.
+
+Ostatnim krokiem rozwoju shaderów było dodanie interaktywnej manipulacji jasnością i nasyceniem barw.
+Do interfejsu użytkownika wprowadzono suwaki, które w czasie rzeczywistym modyfikowały parametry palety, umożliwiając globalną zmianę tonacji mapy.
+Dzięki wykorzystaniu GPU obliczenia były wykonywane natychmiastowo,
+a użytkownik mógł płynnie dostosowywać wygląd gry bez utraty wydajności.
+
+Finalny efekt to system zdolny do generowania i wyświetlania milionów heksagonów w czasie rzeczywistym, z pełną kontrolą nad wyglądem, kolorystyką oraz możliwością interakcji.
+
+\subsection{Podsumowanie}
+
+Rozwój systemu shaderów dla projektu \textit{Multiyoy} stanowił długotrwały proces,
+w trakcie którego prosty zestaw funkcji graficznych został przekształcony w kompletny, wydajny i skalowalny silnik renderujący.
+Całość rozpoczęła się od nauki podstaw działania \textit{WebGL} i rysowania prostych figur,
+a zakończyła na opracowaniu złożonego systemu potrafiącego generować i wyświetlać miliony heksagonów w czasie rzeczywistym.
+
+Kolejne miesiące pracy przyniosły szereg udoskonaleń – od przenoszenia obliczeń do shaderów,
+poprzez dodanie ramek i kolorowych masek, aż po zastosowanie instancjonowania, które wielokrotnie zwiększyło wydajność renderowania.
+W późniejszych etapach stworzono globalny system palet kolorów i mechanizm dynamicznej manipulacji jasnością oraz nasyceniem,
+co pozwoliło na pełną kontrolę nad wyglądem mapy bez utraty płynności.
+
+Stworzony system jest modularny, elastyczny i łatwy w rozbudowie.
+Każdy jego element – od generowania geometrii po przetwarzanie kolorów – może być rozwijany niezależnie,
+co stanowi solidny fundament do dalszych prac nad grą.
+Projekt pokazał również praktyczną wartość shaderów w nowoczesnych aplikacjach webowych:
+pozwalają one osiągnąć poziom wydajności i jakości graficznej zarezerwowany dotąd dla klasycznych silników graficznych.
+
+Efektem końcowym jest stabilny i optymalny moduł graficzny,
+który nie tylko spełnia wymagania projektu \textit{Multiyoy},
+ale może zostać łatwo wykorzystany lub rozwinięty w kolejnych wersjach gry i przyszłych projektach badawczych.
