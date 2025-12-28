@@ -5,8 +5,32 @@ import { updateBrightnessAndSaturationMax } from './utils/updateBrightnessAndSat
 
 const canvas = document.getElementById("main");
 const gl = canvas.getContext("webgl2", {
-        colorSpace: "display-p3"
-    }); // ask for WebGL2 (newer GL). Required for gl_VertexID.
+    colorSpace: "display-p3"
+}); // ask for WebGL2 (newer GL). Required for gl_VertexID.
+
+// === secondary canvas additions (INIT) ===
+const secondaryCanvas = document.getElementById("secondary");
+const gl2 = secondaryCanvas.getContext("webgl2", {
+    colorSpace: "display-p3",
+    premultipliedAlpha: false,
+    alpha: true,
+});
+
+// Ważne: włączamy blending, żeby canvas był przezroczysty
+gl2.enable(gl2.BLEND);
+gl2.blendFunc(gl2.SRC_ALPHA, gl2.ONE_MINUS_SRC_ALPHA);
+
+function resizeCanvases() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    [canvas, secondaryCanvas].forEach((cv) => {
+        cv.width = rect.width * dpr;
+        cv.height = rect.height * dpr;
+    });
+}
+window.addEventListener("resize", resizeCanvases);
+resizeCanvases();
+// === end secondary canvas additions (INIT) ===
 
 const vertexShaderSource = vertexShaderString;
 const fragmentShaderSource = fragmentShaderString;
@@ -74,22 +98,22 @@ const colorTableFill = [
 ];
 const colorTableEdge = [
     [0.6276, 0.257, 29.23],
-    [0.7042, 0.238, 64.78],
-    [0.9655, 0.220, 101.83],
-    [0.8782, 0.228, 142.19],
-    [0.6246, 0.224, 256.84],
-    [0.5072, 0.259, 300.10]
+    [0.6276, 0.257, 29.23],
+    [0.6276, 0.257, 29.23],
+    [0.6276, 0.257, 29.23],
+    [0.6276, 0.257, 29.23],
+    [0.6276, 0.257, 29.23]
 ];
 
 function updateAllColors(brightness, saturation) {
     gl.useProgram(program);
-    
+
     const adjustedFill = colorTableFill.map(([L, C, h]) => [
         Math.min(L * brightness, 1),
         C * saturation,
         h,
     ]);
-    
+
     const adjustedEdge = colorTableEdge.map(([L, C, h]) => [
         Math.min(L * brightness, 1),
         C * saturation,
@@ -201,7 +225,7 @@ gl.vertexAttribPointer(uCenterLoc, 2, gl.FLOAT, false, 0, 0);
 gl.vertexAttribDivisor(uCenterLoc, 1);
 
 const edgeMaskData = new Int32Array(
-    centers.map((_, i) => makeMask(edgeMasks[i % edgeMasks.length]))
+    centers.map((_, i) => makeMask(edgeMasks[0]))
 );
 const edgeMaskBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, edgeMaskBuffer);
@@ -214,9 +238,9 @@ if (uEdgeMaskLoc !== -1) {
 
 const fillMaskData = new Int32Array(
     centers.map(() => {
-        const c1 = Math.floor(Math.random() * 14);
-        const c2 = Math.floor(Math.random() * 14);
-        const v  = Math.random() > 0.5 ? 1 : 0; // random split orientation
+        const c1 = 1;
+        const c2 = 1;
+        const v  = 0;
         return makeHexColorMask(c1, c2, v);
     })
 );
@@ -229,11 +253,17 @@ if (uFillColorMaskLoc !== -1) {
     gl.vertexAttribDivisor(uFillColorMaskLoc, 1);
 }
 function draw() {
+    // ... (to co było wcześniej)
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(...backgroundColor);
-    //gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // === DODAJ TO: Synchronizacja czyszczenia overlayu przy każdym ruchu mapy ===
+    gl2.viewport(0, 0, secondaryCanvas.width, secondaryCanvas.height);
+    gl2.clearColor(0, 0, 0, 0);
+    gl2.clear(gl2.COLOR_BUFFER_BIT);
+    // =========================================================================
 
     gl.useProgram(program);
     gl.bindVertexArray(vao); // bind VAO (no attributes needed)
@@ -241,10 +271,9 @@ function draw() {
 
     gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, centers.length);
 }
+draw();
 
-draw(); // initial draw
-
-let dragging = false; //needed for logic of 'dragging' the hexagon
+let dragging = false;
 let lastX = 0.0;
 let lastY = 0.0;
 let activePointerId = -1;
@@ -256,12 +285,12 @@ canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("pointerleave", endPointer);
 canvas.addEventListener("wheel", wheelMove);
 document.getElementById("brightness").addEventListener("input", (e) => {
-        brightness = parseFloat(e.target.value);
-        draw();
+    brightness = parseFloat(e.target.value);
+    draw();
 });
 document.getElementById("saturation").addEventListener("input", (e) => {
-        saturation = parseFloat(e.target.value);
-        draw();
+    saturation = parseFloat(e.target.value);
+    draw();
 });
 
 function endPointer(e) {
@@ -303,3 +332,144 @@ function wheelMove(e) {
     scale = newScale;
     draw();
 }
+// === secondary canvas additions (LOGIC) ===
+// Helper specjalnie dla GL2, żeby nie mieszać kontekstów
+function compileShaderGL2(type, source) {
+    const shader = gl2.createShader(type); // Tu musi być gl2!
+    gl2.shaderSource(shader, source);
+    gl2.compileShader(shader);
+    if (!gl2.getShaderParameter(shader, gl2.COMPILE_STATUS)) {
+        const info = gl2.getShaderInfoLog(shader);
+        gl2.deleteShader(shader);
+        throw new Error('GL2 Shader compile failed: ' + info);
+    }
+    return shader;
+}
+
+// 1. Setup Shader for GL2
+const hoverVert = compileShaderGL2(gl2.VERTEX_SHADER, vertexShaderSource);
+const hoverFrag = compileShaderGL2(gl2.FRAGMENT_SHADER, fragmentShaderSource);
+const hoverProgram = gl2.createProgram();
+gl2.attachShader(hoverProgram, hoverVert);
+gl2.attachShader(hoverProgram, hoverFrag);
+gl2.linkProgram(hoverProgram);
+
+if (!gl2.getProgramParameter(hoverProgram, gl2.LINK_STATUS)) {
+    throw new Error("Hover Program link failed: " + gl2.getProgramInfoLog(hoverProgram));
+}
+
+// 2. Setup VAO for GL2
+const hoverVao = gl2.createVertexArray();
+// Pusty bind, bo dane lecą z VertexID i Uniformów/Atrybutów stałych
+
+// 3. Get Locations
+const h_uMvpLoc = gl2.getUniformLocation(hoverProgram, "u_mvp");
+const h_uCenterLoc = gl2.getAttribLocation(hoverProgram, "u_center");
+const h_uEdgeMaskLoc = gl2.getAttribLocation(hoverProgram, "u_edgeMask");
+const h_uFillColorMaskLoc = gl2.getAttribLocation(hoverProgram, "u_fillColorMask");
+const h_uBorderLoc = gl2.getUniformLocation(hoverProgram, "u_borderWidth");
+const h_uFillColorsLoc = gl2.getUniformLocation(hoverProgram, "FILL_COLORS");
+const h_uEdgeColorsLoc = gl2.getUniformLocation(hoverProgram, "EDGE_COLORS");
+
+gl2.useProgram(hoverProgram);
+gl2.uniform1f(h_uBorderLoc, 0.15);
+
+function screenToAxial(mouseX, mouseY) {
+    const rect = canvas.getBoundingClientRect(); // Pobierz aktualne wymiary
+    const aspect = rect.width / rect.height;
+
+    // Normalizacja względem rect, a nie window
+    const x = ((mouseX - rect.left) / rect.width) * 2 - 1;
+    const y = -(((mouseY - rect.top) / rect.height) * 2 - 1);
+
+    const scaledX = (x - panOffset.x) / (scale / aspect);
+    const scaledY = (y - panOffset.y) / scale;
+    const q = (Math.sqrt(3) / 3 * scaledX - 1 / 3 * scaledY);
+    const r = (2 / 3) * scaledY;
+    let rq = Math.round(q);
+    let rr = Math.round(r);
+    let rs = Math.round(-q - r);
+    const dq = Math.abs(rq - q);
+    const dr = Math.abs(rr - r);
+    const ds = Math.abs(rs + q + r);
+    if (dq > dr && dq > ds) rq = -rr - rs;
+    else if (dr > ds) rr = -rq - rs;
+    return [rq, rr];
+}
+
+function axialToScreen(q, r) {
+    // To się może przydać później, na razie nieużywane w drawHoverHex
+    // ale zostawiam dla kompletności
+    const [cx, cy] = axialToCenter(q, r, 1.0);
+    const aspect = canvas.width / canvas.height;
+    return {
+        x: (cx * (scale / aspect)) + panOffset.x,
+        y: (cy * scale) + panOffset.y,
+    };
+}
+
+function drawHoverHex(q, r) {
+    // Czyścimy secondary na przezroczysto
+    gl2.viewport(0, 0, secondaryCanvas.width, secondaryCanvas.height);
+    gl2.clearColor(0, 0, 0, 0);
+    gl2.clear(gl2.COLOR_BUFFER_BIT);
+
+    gl2.useProgram(hoverProgram);
+    gl2.bindVertexArray(hoverVao);
+
+    const modelMat = makeModelMat3(panOffset, scale, angle);
+    gl2.uniformMatrix3fv(h_uMvpLoc, false, modelMat);
+
+    const [cx, cy] = axialToCenter(q, r, 1.0);
+    // Ważne: vertexAttrib2f ustawia wartość stałą atrybutu dla całego draw calla
+    gl2.vertexAttrib2f(h_uCenterLoc, cx, cy);
+
+    // Maska krawędzi (wszystkie włączone = 63)
+    gl2.vertexAttribI4i(h_uEdgeMaskLoc, 63, 0, 0, 0);
+    gl2.vertexAttribI4i(h_uFillColorMaskLoc, 0, 0, 0, 0);
+
+    const brightFill = [[1.0, 0.9, 0.0]];
+    const brightEdge = [[1.0, 1.0, 1.0]];
+    gl2.uniform3fv(h_uFillColorsLoc, new Float32Array(brightFill.flat()));
+    gl2.uniform3fv(h_uEdgeColorsLoc, new Float32Array(brightEdge.flat()));
+
+    gl2.drawArrays(gl2.TRIANGLE_FAN, 0, 8);
+}
+
+// 2. WAŻNE: Event listenery musimy przenieść na secondaryCanvas
+// ponieważ on przykrywa główny canvas i kradnie zdarzenia.
+// Musimy też obsłużyć przerysowywanie highlighta przy scrollu/ruchu.
+
+// Zmienna pomocnicza do pozycji myszy
+let lastMX = 0, lastMY = 0;
+
+secondaryCanvas.addEventListener("pointerdown", (e) => {
+    // Przekazujemy logikę do funkcji obsługi dragu (która jest wyżej w kodzie)
+    // UWAGA: musisz zmienić listenery w górnej części kodu z 'canvas' na 'secondaryCanvas'
+    // albo wywołać je tutaj ręcznie, ale lepiej podmienić referencje.
+    onPointerDown(e);
+}, { passive: false });
+
+secondaryCanvas.addEventListener("pointermove", (e) => {
+    lastMX = e.clientX;
+    lastMY = e.clientY;
+
+    // 1. Rysuj highlight
+    const [q, r] = screenToAxial(e.clientX, e.clientY);
+    drawHoverHex(q, r);
+
+    // 2. Obsłuż drag mapy
+    onPointerMove(e);
+}, { passive: false });
+
+secondaryCanvas.addEventListener("pointerup", endPointer);
+secondaryCanvas.addEventListener("pointercancel", endPointer);
+secondaryCanvas.addEventListener("pointerleave", endPointer);
+
+secondaryCanvas.addEventListener("wheel", (e) => {
+    wheelMove(e);
+    // Po zoomie trzeba poprawić highlight w nowym miejscu
+    const [q, r] = screenToAxial(e.clientX, e.clientY);
+    drawHoverHex(q, r);
+});
+// === end secondary canvas additions (LOGIC) ===
