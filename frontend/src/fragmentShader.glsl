@@ -1,5 +1,5 @@
 #version 300 es
-precision highp float;
+precision lowp float;
 
 flat in int v_edgeMask;  // maska krawedzi 
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych

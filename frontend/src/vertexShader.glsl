@@ -1,5 +1,5 @@
 #version 300 es
-precision highp float; 
+precision lowp float; 
 
 const vec2 HEX_OFFSETS[8] = vec2[](
     vec2(0.0, 0.0),   // V0 (center)
