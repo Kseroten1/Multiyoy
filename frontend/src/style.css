@@ -7,9 +7,13 @@ html, body {
     margin: 0;
 }
 
-#main {
+#main, #secondary {
     height: 100dvh;
     width: 100%;
-    background-color: #654321;
     display: block;
+    grid-area: 1 / 1;
+}
+
+section {
+    display: grid;
 }
