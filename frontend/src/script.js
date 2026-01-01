@@ -140,10 +140,23 @@ eventTarget.addEventListener("pointerleave", endDrag);
 
 eventTarget.addEventListener("wheel", (e) => {
     e.preventDefault();
-    const zoom = Math.exp(-e.deltaY * 0.001);
-    state.scale = Math.max(0.000001, Math.min(500.0, state.scale * zoom));
+
+    const rect = eventTarget.getBoundingClientRect();
+    const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const mouseY = -(((e.clientY - rect.top) / rect.height) * 2 - 1); // Y odwrócony
+    
+    const zoomFactor = Math.exp(-e.deltaY * 0.001);
+    const newScale = Math.max(0.000001, Math.min(500.0, state.scale * zoomFactor));
+
+    const effectiveZoom = newScale / state.scale;
+
+    state.panOffset.x -= (mouseX - state.panOffset.x) * (effectiveZoom - 1);
+    state.panOffset.y -= (mouseY - state.panOffset.y) * (effectiveZoom - 1);
+
+    state.scale = newScale;
+
     requestAnimationFrame(draw);
-}, {passive: false});
+}, { passive: false });
 
 // Start
 draw();
