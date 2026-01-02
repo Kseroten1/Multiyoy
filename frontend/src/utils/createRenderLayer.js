@@ -1,25 +1,7 @@
+import {createProgram, createAndBindBuffer, setupAttribute} from './glUtils.js';
+
 export function createRenderLayer(context, vertSource, fragSource, data) {
-    const createShader = (type, source) => {
-        const shader = context.createShader(type);
-        context.shaderSource(shader, source);
-        context.compileShader(shader);
-        if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) {
-            const info = context.getShaderInfoLog(shader);
-            context.deleteShader(shader);
-            throw new Error('Shader compile failed: ' + info);
-        }
-        return shader;
-    };
-
-    const program = context.createProgram();
-    context.attachShader(program, createShader(context.VERTEX_SHADER, vertSource));
-    context.attachShader(program, createShader(context.FRAGMENT_SHADER, fragSource));
-    context.linkProgram(program);
-
-    if (!context.getProgramParameter(program, context.LINK_STATUS)) {
-        throw new Error('Program link failed: ' + context.getProgramInfoLog(program));
-    }
-
+    const program = createProgram(context, vertSource, fragSource);
     const vao = context.createVertexArray();
     context.bindVertexArray(vao);
 
@@ -33,27 +15,27 @@ export function createRenderLayer(context, vertSource, fragSource, data) {
         edgeColors: context.getUniformLocation(program, "EDGE_COLORS")
     };
 
-    const bindAttrib = (loc, bufferData, size, type = context.FLOAT, isInt = false) => {
-        if (loc === -1) return;
-        const buffer = context.createBuffer();
-        context.bindBuffer(context.ARRAY_BUFFER, buffer);
-        context.bufferData(context.ARRAY_BUFFER, bufferData, context.STATIC_DRAW);
-        context.enableVertexAttribArray(loc);
-        isInt
-            ? context.vertexAttribIPointer(loc, size, type, 0, 0)
-            : context.vertexAttribPointer(loc, size, type, false, 0, 0);
-        context.vertexAttribDivisor(loc, 1);
-    };
+    const centerUsage = data.dynamic ? context.DYNAMIC_DRAW : context.STATIC_DRAW;
 
-    // Ładowanie danych
-    bindAttrib(locations.center, data.centers, 2);
-    bindAttrib(locations.edgeMask, data.edgeMasks, 1, context.INT, true);
-    bindAttrib(locations.fillMask, data.fillMasks, 1, context.INT, true);
+    const centersBuffer = createAndBindBuffer(context, data.centers, centerUsage);
+    setupAttribute(context, locations.center, centersBuffer, 2, context.FLOAT, false, 1);
+
+    const edgeMaskBuffer = createAndBindBuffer(context, data.edgeMasks, context.STATIC_DRAW);
+    setupAttribute(context, locations.edgeMask, edgeMaskBuffer, 1, context.INT, true, 1);
+
+    const fillMaskBuffer = createAndBindBuffer(context, data.fillMasks, context.STATIC_DRAW);
+    setupAttribute(context, locations.fillMask, fillMaskBuffer, 1, context.INT, true, 1);
+
+    const updateCenters = (newCentersData) => {
+        context.bindBuffer(context.ARRAY_BUFFER, centersBuffer);
+        context.bufferSubData(context.ARRAY_BUFFER, 0, newCentersData);
+    };
 
     return {
         program,
         vao,
         locations,
-        instanceCount: data.count
+        instanceCount: data.count,
+        updateCenters
     };
 }
