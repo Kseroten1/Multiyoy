@@ -31,7 +31,8 @@ const state = {
     activePointerId: -1,
     mouseX: 0,
     mouseY: 0,
-    hasMouse: false
+    hasMouse: false,
+    renderRequestId: null
 };
 
 const centersVec2 = generateAxialHexCenters(CONFIG.hexRadius, CONFIG.hexSize);
@@ -136,19 +137,26 @@ function updateColors(context, layer) {
     context.uniform1f(layer.locations.borderWidth, CONFIG.defaultBorderWidth);
 }
 
+function scheduleRender() {
+    if (state.renderRequestId !== null) {
+        cancelAnimationFrame(state.renderRequestId);
+    }
+    
+    state.renderRequestId = requestAnimationFrame(() => {
+        drawMain();
+        drawHighlight();
+        state.renderRequestId = null;
+    });
+}
+
 function resize() {
     const dpr = window.devicePixelRatio;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-    if (secondaryCanvas) {
-        secondaryCanvas.width = rect.width * dpr;
-        secondaryCanvas.height = rect.height * dpr;
-    }
-    requestAnimationFrame(() => {
-        drawMain();
-        drawHighlight();
-    });
+    secondaryCanvas.width = rect.width * dpr;
+    secondaryCanvas.height = rect.height * dpr;
+    scheduleRender();
 }
 
 window.addEventListener("resize", resize);
@@ -164,20 +172,14 @@ if (brightnessInput) {
         "input",
         (e) => {
             state.brightness = parseFloat(e.target.value);
-            requestAnimationFrame(() => {
-                drawMain();
-                drawHighlight();
-            });
+            scheduleRender();
         });
 }
 if (saturationInput) {
     saturationInput.max = maxSaturation;
     saturationInput.addEventListener("input", (e) => {
         state.saturation = parseFloat(e.target.value);
-        requestAnimationFrame(() => {
-            drawMain();
-            drawHighlight();
-        });
+        scheduleRender();
     });
 }
 
@@ -211,10 +213,7 @@ eventTarget.addEventListener("pointermove", (e) => {
         state.panOffset.x += clipDeltaX;
         state.panOffset.y += clipDeltaY;
 
-        requestAnimationFrame(() => {
-            drawMain();
-            drawHighlight();
-        });
+        scheduleRender();
     } else {
         requestAnimationFrame(drawHighlight);
     }
@@ -248,10 +247,7 @@ eventTarget.addEventListener("wheel", (e) => {
 
     state.scale = newScale;
 
-    requestAnimationFrame(() => {
-        drawMain();
-        drawHighlight();
-    });
+    scheduleRender();
 }, {passive: false});
 
 drawMain();
