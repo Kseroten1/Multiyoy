@@ -12,6 +12,8 @@ export function createSpriteLayer(gl, vert, frag, atlasTexture) {
         u_mvp: gl.getUniformLocation(program, "u_mvp"),
         u_size: gl.getUniformLocation(program, "u_size"),
         u_atlas: gl.getUniformLocation(program, "u_atlas"),
+        u_brightness: gl.getUniformLocation(program, "u_brightness"),
+        u_saturation: gl.getUniformLocation(program, "u_saturation")
     };
 
     const bufferCenters = createInstanceBuffer(
@@ -46,10 +48,13 @@ export function createSpriteLayer(gl, vert, frag, atlasTexture) {
             gl.bufferData(gl.ARRAY_BUFFER, textureIndices, gl.DYNAMIC_DRAW);
         },
 
-        draw: (modelMatrix, hexSize) => {
+        draw: (modelMatrix, hexSize, brightness, saturation) => {
             if (instanceCount === 0) return;
 
             gl.useProgram(program);
+
+            gl.uniform1f(locs.u_brightness, brightness);
+            gl.uniform1f(locs.u_saturation, saturation);
 
             gl.uniformMatrix3fv(locs.u_mvp, false, modelMatrix);
             gl.uniform1f(locs.u_size, hexSize);

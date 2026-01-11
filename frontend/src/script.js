@@ -115,7 +115,7 @@ function drawFrame() {
     gl.uniformMatrix3fv(layers.hex.locations.u_mvp, false, modelMatrix);
     gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, layers.hex.instanceCount);
 
-    layers.units.draw(modelMatrix, CONFIG.hexSize);
+    layers.units.draw(modelMatrix, CONFIG.hexSize, state.brightness, state.saturation);
 
     if (!state.hasMouse) {
         return;
@@ -129,7 +129,7 @@ function drawFrame() {
 
     if (state.hlUnitTex.length > 0) {
         layers.highlightUnits.updateData(new Float32Array(state.hlUnitPos), new Float32Array(state.hlUnitTex));
-        layers.highlightUnits.draw(modelMatrix, CONFIG.hexSize);
+        layers.highlightUnits.draw(modelMatrix, CONFIG.hexSize, state.brightness * 1.2, state.saturation);
     }
 }
 
