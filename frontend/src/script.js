@@ -23,7 +23,7 @@ const canvas = document.getElementById("main");
 const secondaryCanvas = document.getElementById("secondary");
 
 const gl = canvas.getContext("webgl2", {colorSpace: "display-p3"});
-const gl2 = secondaryCanvas.getContext("webgl2", {colorSpace: "display-p3", alpha: true});
+const gl2 = secondaryCanvas.getContext("webgl2", {colorSpace: "display-p3"});
 
 const state = {
     panOffset: {x: 0, y: 0},
@@ -36,7 +36,11 @@ const state = {
     mouseX: 0,
     mouseY: 0,
     hasMouse: false,
-    renderRequestId: null
+    renderRequestId: null,
+
+    hlCenters: null,
+    hlUnitTex: null,
+    hlUnitPos: null,
 };
 
 const layers = {
@@ -58,7 +62,7 @@ function createAtlasTexture(glContext, image) {
     return texture;
 }
 
-function updateColors(context, layer) {
+function updateHexColors() {
     const applyColorTransform = (table) => table.map(([L, C, h]) => [
         Math.min(L * state.brightness, 1),
         C * state.saturation,
@@ -67,18 +71,27 @@ function updateColors(context, layer) {
     const fillRgb = convertOklchToRgb(applyColorTransform(COLOR_TABLE_FILL)).flat();
     const edgeRgb = convertOklchToRgb(applyColorTransform(COLOR_TABLE_EDGE)).flat();
 
-    context.uniform3fv(layer.locations.FILL_COLORS, new Float32Array(fillRgb));
-    context.uniform3fv(layer.locations.EDGE_COLORS, new Float32Array(edgeRgb));
-    context.uniform1f(layer.locations.u_borderWidth, CONFIG.defaultBorderWidth);
+    gl.useProgram(layers.hex.program);
+    gl.bindVertexArray(layers.hex.vao);
+    gl.uniform3fv(layers.hex.locations.FILL_COLORS, new Float32Array(fillRgb));
+    gl.uniform3fv(layers.hex.locations.EDGE_COLORS, new Float32Array(edgeRgb));
+    gl.uniform1f(layers.hex.locations.u_borderWidth, CONFIG.defaultBorderWidth);
+
+    gl2.useProgram(layers.highlight.program);
+    gl2.bindVertexArray(layers.highlight.vao);
+    gl2.uniform3fv(layers.highlight.locations.FILL_COLORS, new Float32Array(fillRgb));
+    gl2.uniform3fv(layers.highlight.locations.EDGE_COLORS, new Float32Array(edgeRgb));
+    gl2.uniform1f(layers.highlight.locations.u_borderWidth, CONFIG.defaultBorderWidth);
 }
 
 function updateGameEntities() {
-    if (!layers.units) return;
-
     worldObjects.clear();
-    worldObjects.set("0,0", 0);
-    worldObjects.set("1,0", 1);
-    worldObjects.set("0,1", 2);
+    
+    for (const i of Array.from({ length: 100_000 }, (_, i) => i)) {
+        const x = Math.ceil(Math.random() * 100 - 50)
+        const y = Math.ceil(Math.random() * 100 - 50)
+        worldObjects.set(`${x},${y}`, i % 13);
+    }
 
     const posArray = [];
     const texArray = [];
@@ -96,76 +109,30 @@ function updateGameEntities() {
 function drawFrame() {
     state.renderRequestId = null;
     const modelMatrix = makeModelMat3(state.panOffset, state.scale, canvas.width, canvas.height);
+    
+    gl.useProgram(layers.hex.program);
+    gl.bindVertexArray(layers.hex.vao);
+    gl.uniformMatrix3fv(layers.hex.locations.u_mvp, false, modelMatrix);
+    gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, layers.hex.instanceCount);
 
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    layers.units.draw(modelMatrix, CONFIG.hexSize);
 
-    if (layers.hex) {
-        gl.useProgram(layers.hex.program);
-        gl.bindVertexArray(layers.hex.vao);
-        gl.uniformMatrix3fv(layers.hex.locations.u_mvp, false, modelMatrix);
-        updateColors(gl, layers.hex);
-        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, layers.hex.instanceCount);
+    if (!state.hasMouse) {
+        return;
     }
-
-    if (layers.units) {
-        layers.units.draw(modelMatrix, CONFIG.hexSize);
-    }
-
-    drawHighlightUI(modelMatrix);
-}
-
-function drawHighlightUI(modelMatrix) {
-    gl2.viewport(0, 0, secondaryCanvas.width, secondaryCanvas.height);
-    gl2.clearColor(0, 0, 0, 0);
-    gl2.clear(gl2.COLOR_BUFFER_BIT);
-
-    if (state.hasMouse && layers.highlight) {
-        const aspect = canvas.width / canvas.height;
-        const normX = (state.mouseX / canvas.width) * 2 - 1;
-        const normY = -((state.mouseY / canvas.height) * 2 - 1);
-        const worldX = (normX - state.panOffset.x) / (state.scale / aspect);
-        const worldY = (normY - state.panOffset.y) / state.scale;
-        const [q, r] = hexRound(...pixelToAxial(worldX, worldY, CONFIG.hexSize));
-
-        const neighborOffsets = [[0, 0], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
-
-        const hlCenters = [];
-        const hlUnitPos = [];
-        const hlUnitTex = [];
-
-        for (const [dq, dr] of neighborOffsets) {
-            const curQ = q + dq;
-            const curR = r + dr;
-            const [cx, cy] = axialToCenter(curQ, curR, CONFIG.hexSize);
-
-            hlCenters.push(cx, cy);
-
-            const key = `${curQ},${curR}`;
-            if (worldObjects.has(key)) {
-                hlUnitPos.push(cx, cy);
-                hlUnitTex.push(worldObjects.get(key));
-            }
-        }
-
-        layers.highlight.updateCenters(new Float32Array(hlCenters));
-        gl2.useProgram(layers.highlight.program);
-        gl2.bindVertexArray(layers.highlight.vao);
-        gl2.uniformMatrix3fv(layers.highlight.locations.u_mvp, false, modelMatrix);
-
-        const oldB = state.brightness;
-        state.brightness = 1.4;
-        updateColors(gl2, layers.highlight);
-        state.brightness = oldB;
-        gl2.drawArraysInstanced(gl2.TRIANGLE_FAN, 0, 8, layers.highlight.instanceCount);
-
-        if (hlUnitTex.length > 0) {
-            layers.highlightUnits.updateData(new Float32Array(hlUnitPos), new Float32Array(hlUnitTex));
-            layers.highlightUnits.draw(modelMatrix, CONFIG.hexSize);
-        }
+    
+    layers.highlight.updateCenters(new Float32Array(state.hlCenters));
+    gl2.useProgram(layers.highlight.program);
+    gl2.bindVertexArray(layers.highlight.vao);
+    gl2.uniformMatrix3fv(layers.highlight.locations.u_mvp, false, modelMatrix);
+    gl2.drawArraysInstanced(gl2.TRIANGLE_FAN, 0, 8, layers.highlight.instanceCount);
+    
+    if (state.hlUnitTex.length > 0) {
+        layers.highlightUnits.updateData(new Float32Array(state.hlUnitPos), new Float32Array(state.hlUnitTex));
+        layers.highlightUnits.draw(modelMatrix, CONFIG.hexSize);
     }
 }
+
 
 function scheduleRender() {
     if (state.renderRequestId === null) {
@@ -180,6 +147,11 @@ function resize() {
     canvas.height = rect.height * dpr;
     secondaryCanvas.width = rect.width * dpr;
     secondaryCanvas.height = rect.height * dpr;
+
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl2.viewport(0, 0, secondaryCanvas.width, secondaryCanvas.height);
+    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    
     scheduleRender();
 }
 
@@ -209,76 +181,109 @@ async function init() {
         edgeMasks: new Int32Array(7).fill(makeMask(EDGE_MASKS[0])),
         fillMasks: new Int32Array(7).fill(makeHexColorMask(2, 2, 0)),
         count: 7,
-        dynamic: true
     });
+    
     layers.highlightUnits = createSpriteLayer(gl2, textureVertexShader, textureFragmentShader, atlasTextureHighlight);
+    
+    updateHexColors();
     updateGameEntities();
     resize();
 }
 
-window.addEventListener("resize", resize);
 
-const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
-const bInput = document.getElementById("brightness");
-const sInput = document.getElementById("saturation");
+function updateUnderPointerSelection() {
+    const aspect = canvas.width / canvas.height;
+    const normX = (state.mouseX / canvas.width) * 2 - 1;
+    const normY = -((state.mouseY / canvas.height) * 2 - 1);
+    const worldX = (normX - state.panOffset.x) / (state.scale / aspect);
+    const worldY = (normY - state.panOffset.y) / state.scale;
+    const [q, r] = hexRound(...pixelToAxial(worldX, worldY, CONFIG.hexSize));
+    const neighborOffsets = [[0, 0], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    const hlCenters = [];
+    const hlUnitPos = [];
+    const hlUnitTex = [];
+    for (const [dq, dr] of neighborOffsets) {
+        const curQ = q + dq;
+        const curR = r + dr;
+        const [cx, cy] = axialToCenter(curQ, curR, CONFIG.hexSize);
 
-if (bInput) {
+        hlCenters.push(cx, cy);
+
+        const key = `${curQ},${curR}`;
+        if (worldObjects.has(key)) {
+            hlUnitPos.push(cx, cy);
+            hlUnitTex.push(worldObjects.get(key));
+        }
+    }
+    state.hlCenters = hlCenters;
+    state.hlUnitPos = hlUnitPos;
+    state.hlUnitTex = hlUnitTex;
+}
+
+async function setupEventHandlers() {
+    const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
+    const bInput = document.getElementById("brightness");
+    const sInput = document.getElementById("saturation");
+    
+    window.addEventListener("resize", resize);
     bInput.max = maxB;
-    bInput.addEventListener("input", (e) => { state.brightness = parseFloat(e.target.value); scheduleRender(); });
-}
-if (sInput) {
+    bInput.addEventListener("input", (e) => { state.brightness = parseFloat(e.target.value); updateHexColors(gl, layers.hex); scheduleRender(); });
+
     sInput.max = maxS;
-    sInput.addEventListener("input", (e) => { state.saturation = parseFloat(e.target.value); scheduleRender(); });
-}
+    sInput.addEventListener("input", (e) => { state.saturation = parseFloat(e.target.value); updateHexColors(gl, layers.hex); scheduleRender(); });
 
-secondaryCanvas.addEventListener("pointerdown", (e) => {
-    if (state.dragging) return;
-    e.preventDefault();
-    state.activePointerId = e.pointerId;
-    state.dragging = true;
-    state.lastPosition.x = e.clientX;
-    state.lastPosition.y = e.clientY;
-    secondaryCanvas.setPointerCapture(e.pointerId);
-});
-
-secondaryCanvas.addEventListener("pointermove", (e) => {
-    const rect = secondaryCanvas.getBoundingClientRect();
-    state.mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    state.mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
-    state.hasMouse = true;
-    if (state.dragging && e.pointerId === state.activePointerId) {
-        const deltaX = e.clientX - state.lastPosition.x;
-        const deltaY = e.clientY - state.lastPosition.y;
+    secondaryCanvas.addEventListener("pointerdown", (e) => {
+        if (state.dragging) return;
+        e.preventDefault();
+        state.activePointerId = e.pointerId;
+        state.dragging = true;
         state.lastPosition.x = e.clientX;
         state.lastPosition.y = e.clientY;
+        secondaryCanvas.setPointerCapture(e.pointerId);
+    });
 
-        state.panOffset.x += (deltaX / rect.width) * 2.0;
-        state.panOffset.y -= (deltaY / rect.height) * 2.0;
-    }
-    scheduleRender();
-});
+    secondaryCanvas.addEventListener("pointermove", (e) => {
+        const rect = secondaryCanvas.getBoundingClientRect();
+        state.mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        state.mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        state.hasMouse = true;
+        if (state.dragging && e.pointerId === state.activePointerId) {
+            const deltaX = e.clientX - state.lastPosition.x;
+            const deltaY = e.clientY - state.lastPosition.y;
+            state.lastPosition.x = e.clientX;
+            state.lastPosition.y = e.clientY;
 
-const endDrag = (e) => {
-    if (!state.dragging || e.pointerId !== state.activePointerId) return;
-    state.dragging = false;
-    secondaryCanvas.releasePointerCapture(e.pointerId);
-};
+            state.panOffset.x += (deltaX / rect.width) * 2.0;
+            state.panOffset.y -= (deltaY / rect.height) * 2.0;
+        }
+        updateUnderPointerSelection();
+        scheduleRender();
+    });
 
-secondaryCanvas.addEventListener("pointerup", endDrag);
-secondaryCanvas.addEventListener("pointerleave", endDrag);
+    const endDrag = (e) => {
+        if (!state.dragging || e.pointerId !== state.activePointerId) return;
+        state.dragging = false;
+        secondaryCanvas.releasePointerCapture(e.pointerId);
+    };
 
-secondaryCanvas.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    const rect = secondaryCanvas.getBoundingClientRect();
-    const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const my = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-    const zoom = Math.exp(-e.deltaY * 0.001);
-    const newScale = Math.max(0.0005, Math.min(500.0, state.scale * zoom));
-    const eff = newScale / state.scale;
-    state.panOffset.x -= (mx - state.panOffset.x) * (eff - 1);
-    state.panOffset.y -= (my - state.panOffset.y) * (eff - 1);
-    state.scale = newScale;
-    scheduleRender();
-}, { passive: false });
+    secondaryCanvas.addEventListener("pointerup", endDrag);
+    secondaryCanvas.addEventListener("pointerleave", endDrag);
 
-init();
+    secondaryCanvas.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const rect = secondaryCanvas.getBoundingClientRect();
+        const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const my = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+        const zoom = Math.exp(-e.deltaY * 0.001);
+        const newScale = Math.max(0.0005, Math.min(500.0, state.scale * zoom));
+        const eff = newScale / state.scale;
+        state.panOffset.x -= (mx - state.panOffset.x) * (eff - 1);
+        state.panOffset.y -= (my - state.panOffset.y) * (eff - 1);
+        state.scale = newScale;
+        updateUnderPointerSelection();
+        scheduleRender();
+    }, { passive: false });
+}
+
+await init();
+await setupEventHandlers();

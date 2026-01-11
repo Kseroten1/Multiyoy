@@ -51,9 +51,6 @@ export function createSpriteLayer(gl, vert, frag, atlasTexture) {
 
             gl.useProgram(program);
 
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
             gl.uniformMatrix3fv(locs.u_mvp, false, modelMatrix);
             gl.uniform1f(locs.u_size, hexSize);
 
@@ -63,9 +60,6 @@ export function createSpriteLayer(gl, vert, frag, atlasTexture) {
 
             gl.bindVertexArray(vao);
             gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, instanceCount);
-
-            gl.disable(gl.BLEND);
-            gl.bindVertexArray(null);
         }
     };
 }
