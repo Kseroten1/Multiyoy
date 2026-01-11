@@ -1,10 +1,14 @@
-import vertexShaderString from './vertexShader.glsl?raw'
-import fragmentShaderString from './fragmentShader.glsl?raw'
-import {convertOklchToRgb} from './utils/convertOklchToRgb.js'
-import {updateBrightnessAndSaturationMax} from './utils/updateBrightnessAndSaturationMax.js'
-import {createRenderLayer} from './utils/createRenderLayer.js'
+import vertexShaderString from './shaders/vertexShader.glsl?raw';
+import fragmentShaderString from './shaders/fragmentShader.glsl?raw';
+import textureVertexShader from './shaders/texture.vert?raw';
+import textureFragmentShader from './shaders/texture.frag?raw';
 
-import {CONFIG, COLOR_TABLE_FILL, COLOR_TABLE_EDGE, EDGE_MASKS} from './utils/config.js'
+import { convertOklchToRgb } from './utils/convertOklchToRgb.js';
+import { updateBrightnessAndSaturationMax } from './utils/updateBrightnessAndSaturationMax.js';
+import { createHexLayer } from './utils/createHexLayer.js';
+import { createSpriteLayer } from './utils/createSpriteLayer.js';
+
+import { CONFIG, COLOR_TABLE_FILL, COLOR_TABLE_EDGE, EDGE_MASKS } from './utils/config.js';
 import {
     generateAxialHexCenters,
     makeMask,
@@ -13,7 +17,7 @@ import {
     pixelToAxial,
     hexRound,
     axialToCenter
-} from './utils/math.js'
+} from './utils/math.js';
 
 const canvas = document.getElementById("main");
 const secondaryCanvas = document.getElementById("secondary");
@@ -35,92 +39,23 @@ const state = {
     renderRequestId: null
 };
 
-const centersVec2 = generateAxialHexCenters(CONFIG.hexRadius, CONFIG.hexSize);
-const centersData = new Float32Array(centersVec2.flat());
-const edgeMaskData = new Int32Array(centersVec2.map(() => makeMask(EDGE_MASKS[0])));
-const fillMaskData = new Int32Array(centersVec2.map(() => makeHexColorMask(1, 1, 0)));
+const layers = {
+    hex: null,
+    units: null,
+    highlight: null,
+    highlightUnits: null
+};
 
-const highlightCenterData = new Float32Array(7 * 2);
-const highlightEdgeMask = new Int32Array(7).fill(makeMask(EDGE_MASKS[0]));
-const highlightFillMask = new Int32Array(7).fill(makeHexColorMask(1, 1, 0));
-highlightFillMask[0] = makeHexColorMask(2, 2, 0);
+const worldObjects = new Map();
 
-const mainLayer = createRenderLayer(gl, vertexShaderString, fragmentShaderString, {
-    centers: centersData,
-    edgeMasks: edgeMaskData,
-    fillMasks: fillMaskData,
-    count: centersVec2.length
-});
-
-const highlightLayer = createRenderLayer(gl2, vertexShaderString, fragmentShaderString, {
-    centers: highlightCenterData,
-    edgeMasks: highlightEdgeMask,
-    fillMasks: highlightFillMask,
-    count: 7,
-    dynamic: true
-});
-
-function drawMain() {
-    gl.viewport(0, 0, canvas.width, canvas.height);
-
-    updateColors(gl, mainLayer);
-
-    gl.useProgram(mainLayer.program);
-    gl.bindVertexArray(mainLayer.vao);
-
-    const modelMat = makeModelMat3(state.panOffset, state.scale, canvas.width, canvas.height);
-    gl.uniformMatrix3fv(mainLayer.locations.mvp, false, modelMat);
-
-    gl.clearColor(...CONFIG.backgroundColor);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, mainLayer.instanceCount);
-}
-
-function drawHighlight() {
-    if (state.hasMouse) {
-        const aspect = canvas.width / canvas.height;
-
-        const normX = (state.mouseX / canvas.width) * 2 - 1;
-        const normY = -((state.mouseY / canvas.height) * 2 - 1);
-
-        const worldX = (normX - state.panOffset.x) / (state.scale / aspect);
-        const worldY = (normY - state.panOffset.y) / state.scale;
-
-        const [qFrac, rFrac] = pixelToAxial(worldX, worldY, CONFIG.hexSize);
-        const [centerQ, centerR] = hexRound(qFrac, rFrac);
-
-        const neighborOffsets = [
-            [0, 0], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]
-        ];
-
-        const newCenters = new Float32Array(14);
-        let i = 0;
-        for (const [deltaQ, deltaR] of neighborOffsets) {
-            const [centerX, centerY] = axialToCenter(centerQ + deltaQ, centerR + deltaR, CONFIG.hexSize);
-            newCenters[i++] = centerX;
-            newCenters[i++] = centerY;
-        }
-
-        highlightLayer.updateCenters(newCenters);
-    }
-
-    gl2.viewport(0, 0, secondaryCanvas.width, secondaryCanvas.height);
-    gl2.clearColor(0, 0, 0, 0);
-    gl2.clear(gl2.COLOR_BUFFER_BIT);
-
-    gl2.useProgram(highlightLayer.program);
-    gl2.bindVertexArray(highlightLayer.vao);
-
-    const modelMat = makeModelMat3(state.panOffset, state.scale, canvas.width, canvas.height);
-    gl2.uniformMatrix3fv(highlightLayer.locations.mvp, false, modelMat);
-
-    const originalB = state.brightness;
-    state.brightness = 1.4;
-    updateColors(gl2, highlightLayer);
-    state.brightness = originalB;
-
-    gl2.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, highlightLayer.instanceCount);
+function createAtlasTexture(glContext, image) {
+    const texture = glContext.createTexture();
+    glContext.bindTexture(glContext.TEXTURE_2D, texture);
+    glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MIN_FILTER, glContext.NEAREST_MIPMAP_NEAREST);
+    glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MAG_FILTER, glContext.NEAREST);
+    glContext.texImage2D(glContext.TEXTURE_2D, 0, glContext.RGBA, glContext.RGBA, glContext.UNSIGNED_BYTE, image);
+    glContext.generateMipmap(glContext.TEXTURE_2D);
+    return texture;
 }
 
 function updateColors(context, layer) {
@@ -132,21 +67,110 @@ function updateColors(context, layer) {
     const fillRgb = convertOklchToRgb(applyColorTransform(COLOR_TABLE_FILL)).flat();
     const edgeRgb = convertOklchToRgb(applyColorTransform(COLOR_TABLE_EDGE)).flat();
 
-    context.uniform3fv(layer.locations.fillColors, new Float32Array(fillRgb));
-    context.uniform3fv(layer.locations.edgeColors, new Float32Array(edgeRgb));
-    context.uniform1f(layer.locations.borderWidth, CONFIG.defaultBorderWidth);
+    context.uniform3fv(layer.locations.FILL_COLORS, new Float32Array(fillRgb));
+    context.uniform3fv(layer.locations.EDGE_COLORS, new Float32Array(edgeRgb));
+    context.uniform1f(layer.locations.u_borderWidth, CONFIG.defaultBorderWidth);
+}
+
+function updateGameEntities() {
+    if (!layers.units) return;
+
+    worldObjects.clear();
+    worldObjects.set("0,0", 0);
+    worldObjects.set("1,0", 1);
+    worldObjects.set("0,1", 2);
+
+    const posArray = [];
+    const texArray = [];
+
+    for (const [key, texID] of worldObjects) {
+        const [q, r] = key.split(',').map(Number);
+        const [x, y] = axialToCenter(q, r, CONFIG.hexSize);
+        posArray.push(x, y);
+        texArray.push(texID);
+    }
+
+    layers.units.updateData(new Float32Array(posArray), new Float32Array(texArray));
+}
+
+function drawFrame() {
+    state.renderRequestId = null;
+    const modelMatrix = makeModelMat3(state.panOffset, state.scale, canvas.width, canvas.height);
+
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    if (layers.hex) {
+        gl.useProgram(layers.hex.program);
+        gl.bindVertexArray(layers.hex.vao);
+        gl.uniformMatrix3fv(layers.hex.locations.u_mvp, false, modelMatrix);
+        updateColors(gl, layers.hex);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, layers.hex.instanceCount);
+    }
+
+    if (layers.units) {
+        layers.units.draw(modelMatrix, CONFIG.hexSize);
+    }
+
+    drawHighlightUI(modelMatrix);
+}
+
+function drawHighlightUI(modelMatrix) {
+    gl2.viewport(0, 0, secondaryCanvas.width, secondaryCanvas.height);
+    gl2.clearColor(0, 0, 0, 0);
+    gl2.clear(gl2.COLOR_BUFFER_BIT);
+
+    if (state.hasMouse && layers.highlight) {
+        const aspect = canvas.width / canvas.height;
+        const normX = (state.mouseX / canvas.width) * 2 - 1;
+        const normY = -((state.mouseY / canvas.height) * 2 - 1);
+        const worldX = (normX - state.panOffset.x) / (state.scale / aspect);
+        const worldY = (normY - state.panOffset.y) / state.scale;
+        const [q, r] = hexRound(...pixelToAxial(worldX, worldY, CONFIG.hexSize));
+
+        const neighborOffsets = [[0, 0], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+
+        const hlCenters = [];
+        const hlUnitPos = [];
+        const hlUnitTex = [];
+
+        for (const [dq, dr] of neighborOffsets) {
+            const curQ = q + dq;
+            const curR = r + dr;
+            const [cx, cy] = axialToCenter(curQ, curR, CONFIG.hexSize);
+
+            hlCenters.push(cx, cy);
+
+            const key = `${curQ},${curR}`;
+            if (worldObjects.has(key)) {
+                hlUnitPos.push(cx, cy);
+                hlUnitTex.push(worldObjects.get(key));
+            }
+        }
+
+        layers.highlight.updateCenters(new Float32Array(hlCenters));
+        gl2.useProgram(layers.highlight.program);
+        gl2.bindVertexArray(layers.highlight.vao);
+        gl2.uniformMatrix3fv(layers.highlight.locations.u_mvp, false, modelMatrix);
+
+        const oldB = state.brightness;
+        state.brightness = 1.4;
+        updateColors(gl2, layers.highlight);
+        state.brightness = oldB;
+        gl2.drawArraysInstanced(gl2.TRIANGLE_FAN, 0, 8, layers.highlight.instanceCount);
+
+        if (hlUnitTex.length > 0) {
+            layers.highlightUnits.updateData(new Float32Array(hlUnitPos), new Float32Array(hlUnitTex));
+            layers.highlightUnits.draw(modelMatrix, CONFIG.hexSize);
+        }
+    }
 }
 
 function scheduleRender() {
-    if (state.renderRequestId !== null) {
-        cancelAnimationFrame(state.renderRequestId);
+    if (state.renderRequestId === null) {
+        state.renderRequestId = requestAnimationFrame(drawFrame);
     }
-    
-    state.renderRequestId = requestAnimationFrame(() => {
-        drawMain();
-        drawHighlight();
-        state.renderRequestId = null;
-    });
 }
 
 function resize() {
@@ -159,45 +183,66 @@ function resize() {
     scheduleRender();
 }
 
-window.addEventListener("resize", resize);
-resize();
+async function init() {
+    const centersVec2 = generateAxialHexCenters(CONFIG.hexRadius, CONFIG.hexSize);
+    const centersData = new Float32Array(centersVec2.flat());
+    const edgeMaskData = new Int32Array(centersVec2.map(() => makeMask(EDGE_MASKS[0])));
+    const fillMaskData = new Int32Array(centersVec2.map(() => makeHexColorMask(1, 1, 0)));
 
-const [maxBrightness, maxSaturation] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
-const brightnessInput = document.getElementById("brightness");
-const saturationInput = document.getElementById("saturation");
-
-if (brightnessInput) {
-    brightnessInput.max = maxBrightness;
-    brightnessInput.addEventListener(
-        "input",
-        (e) => {
-            state.brightness = parseFloat(e.target.value);
-            scheduleRender();
-        });
-}
-if (saturationInput) {
-    saturationInput.max = maxSaturation;
-    saturationInput.addEventListener("input", (e) => {
-        state.saturation = parseFloat(e.target.value);
-        scheduleRender();
+    const atlasImage = new Image();
+    atlasImage.src = './assets/atlas.png';
+    await new Promise((resolve) => atlasImage.onload = resolve);
+    const atlasTexture = createAtlasTexture(gl, atlasImage);
+    const atlasTextureHighlight = createAtlasTexture(gl2, atlasImage);
+    
+    layers.hex = createHexLayer(gl, vertexShaderString, fragmentShaderString, {
+        centers: centersData,
+        edgeMasks: edgeMaskData,
+        fillMasks: fillMaskData,
+        count: centersVec2.length
     });
+
+    layers.units = createSpriteLayer(gl, textureVertexShader, textureFragmentShader, atlasTexture);
+
+    layers.highlight = createHexLayer(gl2, vertexShaderString, fragmentShaderString, {
+        centers: new Float32Array(14),
+        edgeMasks: new Int32Array(7).fill(makeMask(EDGE_MASKS[0])),
+        fillMasks: new Int32Array(7).fill(makeHexColorMask(2, 2, 0)),
+        count: 7,
+        dynamic: true
+    });
+    layers.highlightUnits = createSpriteLayer(gl2, textureVertexShader, textureFragmentShader, atlasTextureHighlight);
+    updateGameEntities();
+    resize();
 }
 
-const eventTarget = secondaryCanvas;
+window.addEventListener("resize", resize);
 
-eventTarget.addEventListener("pointerdown", (e) => {
+const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
+const bInput = document.getElementById("brightness");
+const sInput = document.getElementById("saturation");
+
+if (bInput) {
+    bInput.max = maxB;
+    bInput.addEventListener("input", (e) => { state.brightness = parseFloat(e.target.value); scheduleRender(); });
+}
+if (sInput) {
+    sInput.max = maxS;
+    sInput.addEventListener("input", (e) => { state.saturation = parseFloat(e.target.value); scheduleRender(); });
+}
+
+secondaryCanvas.addEventListener("pointerdown", (e) => {
     if (state.dragging) return;
     e.preventDefault();
     state.activePointerId = e.pointerId;
     state.dragging = true;
     state.lastPosition.x = e.clientX;
     state.lastPosition.y = e.clientY;
-    eventTarget.setPointerCapture(e.pointerId);
-}, {passive: false});
+    secondaryCanvas.setPointerCapture(e.pointerId);
+});
 
-eventTarget.addEventListener("pointermove", (e) => {
-    e.preventDefault();
-    const rect = eventTarget.getBoundingClientRect();
+secondaryCanvas.addEventListener("pointermove", (e) => {
+    const rect = secondaryCanvas.getBoundingClientRect();
     state.mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
     state.mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
     state.hasMouse = true;
@@ -207,47 +252,33 @@ eventTarget.addEventListener("pointermove", (e) => {
         state.lastPosition.x = e.clientX;
         state.lastPosition.y = e.clientY;
 
-        const clipDeltaX = (deltaX / rect.width) * 2.0;
-        const clipDeltaY = -((deltaY / rect.height) * 2.0);
-
-        state.panOffset.x += clipDeltaX;
-        state.panOffset.y += clipDeltaY;
-
-        scheduleRender();
-    } else {
-        requestAnimationFrame(drawHighlight);
+        state.panOffset.x += (deltaX / rect.width) * 2.0;
+        state.panOffset.y -= (deltaY / rect.height) * 2.0;
     }
-}, {passive: false});
+    scheduleRender();
+});
 
 const endDrag = (e) => {
     if (!state.dragging || e.pointerId !== state.activePointerId) return;
     state.dragging = false;
-    state.activePointerId = -1;
-    eventTarget.releasePointerCapture(e.pointerId);
+    secondaryCanvas.releasePointerCapture(e.pointerId);
 };
 
-eventTarget.addEventListener("pointerup", endDrag);
-eventTarget.addEventListener("pointercancel", endDrag);
-eventTarget.addEventListener("pointerleave", endDrag);
+secondaryCanvas.addEventListener("pointerup", endDrag);
+secondaryCanvas.addEventListener("pointerleave", endDrag);
 
-eventTarget.addEventListener("wheel", (e) => {
+secondaryCanvas.addEventListener("wheel", (e) => {
     e.preventDefault();
-
-    const rect = eventTarget.getBoundingClientRect();
-    const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const mouseY = -(((e.clientY - rect.top) / rect.height) * 2 - 1); // Y odwrócony
-
-    const zoomFactor = Math.exp(-e.deltaY * 0.001);
-    const newScale = Math.max(0.000001, Math.min(500.0, state.scale * zoomFactor));
-
-    const effectiveZoom = newScale / state.scale;
-
-    state.panOffset.x -= (mouseX - state.panOffset.x) * (effectiveZoom - 1);
-    state.panOffset.y -= (mouseY - state.panOffset.y) * (effectiveZoom - 1);
-
+    const rect = secondaryCanvas.getBoundingClientRect();
+    const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const my = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+    const zoom = Math.exp(-e.deltaY * 0.001);
+    const newScale = Math.max(0.0005, Math.min(500.0, state.scale * zoom));
+    const eff = newScale / state.scale;
+    state.panOffset.x -= (mx - state.panOffset.x) * (eff - 1);
+    state.panOffset.y -= (my - state.panOffset.y) * (eff - 1);
     state.scale = newScale;
-
     scheduleRender();
-}, {passive: false});
+}, { passive: false });
 
-drawMain();
+init();

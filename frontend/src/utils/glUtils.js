@@ -49,3 +49,34 @@ export function setupAttribute(gl, location, buffer, size, type = gl.FLOAT, isIn
 
     gl.vertexAttribDivisor(location, divisor);
 }
+
+export function createLayerBase(gl, vertSource, fragSource) {
+    const program = createProgram(gl, vertSource, fragSource);
+    const vao = gl.createVertexArray();
+    return { program, vao };
+}
+
+export function getLocations(gl, program, attribNames, uniformNames) {
+    const locs = {};
+    attribNames.forEach(n => locs[n] = gl.getAttribLocation(program, n));
+    uniformNames.forEach(n => locs[n] = gl.getUniformLocation(program, n));
+    return locs;
+}
+
+export function createInstanceBuffer(gl, vao, location, data, size, type = gl.FLOAT) {
+    gl.bindVertexArray(vao);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+
+    gl.enableVertexAttribArray(location);
+    if (type === gl.INT) {
+        gl.vertexAttribIPointer(location, size, type, 0, 0);
+    } else {
+        gl.vertexAttribPointer(location, size, type, false, 0, 0);
+    }
+    gl.vertexAttribDivisor(location, 1);
+
+    return buffer;
+}
