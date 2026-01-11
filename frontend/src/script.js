@@ -150,7 +150,6 @@ function resize() {
 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl2.viewport(0, 0, secondaryCanvas.width, secondaryCanvas.height);
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     scheduleRender();
 }
@@ -227,10 +226,10 @@ async function setupEventHandlers() {
 
     window.addEventListener("resize", resize);
     bInput.max = maxB;
-    bInput.addEventListener("input", (e) => { state.brightness = parseFloat(e.target.value); updateHexColors(gl, layers.hex); scheduleRender(); });
+    bInput.addEventListener("input", (e) => { state.brightness = e.target.value; updateHexColors(gl, layers.hex); scheduleRender(); });
 
     sInput.max = maxS;
-    sInput.addEventListener("input", (e) => { state.saturation = parseFloat(e.target.value); updateHexColors(gl, layers.hex); scheduleRender(); });
+    sInput.addEventListener("input", (e) => { state.saturation = e.target.value; updateHexColors(gl, layers.hex); scheduleRender(); });
 
     secondaryCanvas.addEventListener("pointerdown", (e) => {
         if (state.dragging) return;
