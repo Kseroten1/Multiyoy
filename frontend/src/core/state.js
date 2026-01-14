@@ -10,6 +10,8 @@ export const state = {
     mouseY: 0,
     hasMouse: false,
     renderRequestId: null,
+    hoverQ: 0,
+    hoverR: 0,
 
     hlCenters: null,
     hlUnitTex: null,

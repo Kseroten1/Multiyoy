@@ -3,10 +3,10 @@ import fragmentShaderString from './shaders/fragmentShader.glsl?raw';
 import textureVertexShader from './shaders/texture.vert?raw';
 import textureFragmentShader from './shaders/texture.frag?raw';
 
-import { createHexLayer } from './utils/createHexLayer.js';
-import { createSpriteLayer } from './utils/createSpriteLayer.js';
-import { CONFIG, EDGE_MASKS } from './utils/config.js';
-import {generateAxialHexCenters, makeMask, makeHexColorMask } from './utils/math.js';
+import {createHexLayer} from './utils/createHexLayer.js';
+import {createSpriteLayer} from './utils/createSpriteLayer.js';
+import {CONFIG, EDGE_MASKS} from './utils/config.js';
+import {generateAxialHexCenters, makeMask, makeHexColorMask} from './utils/math.js';
 import {setupEventHandlers} from "./core/inputHandler.js";
 import {gl, gl2, resize, updateHexColors} from "./core/renderer.js";
 import {layers} from "./core/state.js";
