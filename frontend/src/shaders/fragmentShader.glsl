@@ -1,22 +1,21 @@
 #version 300 es
 precision highp float;
 
-flat in int v_edgeMask;  // maska krawedzi 
+uniform vec3 EDGE_COLORS[6];
+uniform vec3 FILL_COLORS[14];
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
+
+flat in int v_edgeMask;  // maska krawedzi 
 flat in int v_fillColorMask;
 flat in int v_vertexID;
 in vec2 v_local;
+
 out vec4 outColor;
 
 const float cos60 = cos(radians(60.0));
 const float sin60 = sin(radians(60.0));
 const vec3 fillColor = vec3(1.0, 1.0, 1.0);
 
-int getBitAt(int mask, int index) {
-    int shifted = mask >> int(index); // przesuniecie bitowe w prawo
-    int hexSideMaskOn = shifted & 1; // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
-    return int(hexSideMaskOn);
-}
 
 const vec2 HEX_OFFSETS[6] = vec2[](
     vec2(cos(radians(90.0)),   sin(radians(90.0))),   // V0 – góra
@@ -27,8 +26,11 @@ const vec2 HEX_OFFSETS[6] = vec2[](
     vec2(cos(radians(150.0)),  sin(radians(150.0)))  // V5 – lewy‑góra
 );
 
-uniform vec3 EDGE_COLORS[6];
-uniform vec3 FILL_COLORS[14];
+int getBitAt(int mask, int index) {
+    int shifted = mask >> int(index); // przesuniecie bitowe w prawo
+    int hexSideMaskOn = shifted & 1; // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
+    return int(hexSideMaskOn);
+}
 
 float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVertex) {
     float A = firstVertex.y - secondVertex.y;

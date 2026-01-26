@@ -1,9 +1,3 @@
-export const CONFIG = {
-    hexRadius: 600,
-    hexSize: 1.0,
-    defaultBorderWidth: 0.1,
-    backgroundColor: [1.0, 1.0, 1.0, 1]
-};
 
 export const COLOR_TABLE_FILL = [
     [0.2575, 0.072, 254.83], [0.5398, 0.183, 254.16], [0.7804, 0.099, 228.76],

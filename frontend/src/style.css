@@ -5,6 +5,7 @@
 html, body {
     height: 100%;
     margin: 0;
+  overscroll-behavior: none;
 }
 
 #main, #secondary {
@@ -16,6 +17,7 @@ html, body {
 
 #canvases {
     display: grid;
+  /*pointer-events: none;*/ // TODO: Long click mobile, prevent without js
 }
 
 #ui-panel {
