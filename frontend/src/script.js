@@ -20,6 +20,11 @@ const CONFIG = {
 const bInput = document.getElementById("brightness");
 /** @type {HTMLInputElement} */
 const sInput = document.getElementById("saturation");
+
+const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
+bInput.max = maxB;
+sInput.max = maxS;
+
 const canvas = document.getElementById("main");
 /** @type {WebGL2RenderingContext} */
 const gl = canvas.getContext("webgl2", {colorSpace: "display-p3"});
@@ -71,22 +76,20 @@ const precalculatedEdgeMasks = Array.from({length: instanceCount}, () => makeMas
 
 const bufferCenters = initBuffer(
   locations.center,
-  hexagonPrecalculatedCenters,
+  /** @type {ArrayLike<number>} */ hexagonPrecalculatedCenters,
   2,
 );
   
 const bufferFill = initBuffer(
   locations.fillColorMask,
-  precalculatedFillMask,
+  /** @type {ArrayLike<number>} */ precalculatedFillMask,
   1,
-  gl.INT,
 );
 
 const bufferEdge = initBuffer(
   locations.edgeMask,
-  precalculatedEdgeMasks,
+  /** @type {ArrayLike<number>} */ precalculatedEdgeMasks,
   1,
-  gl.INT,
 );
 
 onResize();
@@ -96,43 +99,28 @@ initEventHandlers();
 /**
  * 
  * @param location {GLuint}
- * @param data {number[]}
+ * @param data {ArrayLike<number>}
  * @param size {Number}
- * @param type {GLenum}
  * @returns {WebGLBuffer}
  */
-function initBuffer(location, data, size, type = gl.FLOAT) {
+function initBuffer(location, data, size) {
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.enableVertexAttribArray(location);
-
-  if (type === gl.INT) {
-    data = /** @type {any} */ new Int32Array(data);
-    gl.vertexAttribIPointer(location, size, type, 0, 0);
-  } else {
-    data = /** @type {any} */ new Float32Array(data);
-    gl.vertexAttribPointer(location, size, type, false, 0, 0);
-  }
-
-  gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+  gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
   gl.vertexAttribDivisor(location, 1);
-
   return buffer;
 }
 
 /**
  *
  * @param buffer {WebGLBuffer}
- * @param data {number[] | ArrayBuffer}
- * @param type 
+ * @param data {ArrayLike<number>}
  */
-function modifyBuffer(buffer, data, type = gl.FLOAT) {
+function modifyBuffer(buffer, data) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  const typed = data instanceof ArrayBuffer ? data : type === gl.INT
-    ? new Int32Array(data)
-    : new Float32Array(data);
-  
-  gl.bufferSubData(gl.ARRAY_BUFFER, 0, typed);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(data));
 }
   
 function draw() {
@@ -155,8 +143,7 @@ function onResize() {
   canvas.height = window.innerHeight * dpr;
 
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  projectionMatrix = new DOMMatrix()
-    .scaleSelf(2 / window.innerWidth, -2 / window.innerHeight);
+  projectionMatrix = new DOMMatrix().scaleSelf(2 / window.innerWidth, -2 / window.innerHeight);
   scheduleRender();
 }
 
@@ -216,11 +203,7 @@ function initEventHandlers() {
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointerleave", endDrag);
   window.addEventListener("resize", onResize);
-
-  const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
-  bInput.max = maxB;
-  sInput.max = maxS;
-
+  
   function onInputChange() {
     gl.uniform3fv(locations.fillColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL));
     gl.uniform3fv(locations.edgeColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_EDGE));
@@ -232,15 +215,15 @@ function initEventHandlers() {
 }
 
 for (let i = 0; i < 1000; i++) {
-  await new Promise(r => setTimeout(r, 100));
-  console.log("Lowering hex count to first 1k");
-  instanceCount = 1000;
-  scheduleRender();
+  // await new Promise(r => setTimeout(r, 100));
+  // console.log("Lowering hex count to first 1k");
+  // instanceCount = 1000;
+  // scheduleRender();
 
-  await new Promise(r => setTimeout(r, 100));
+  await new Promise(r => setTimeout(r, 10));
   console.log("Changing hexagon centers to random 50%");
   const randomCenters = hexagonPrecalculatedCenters.filter(() => Math.random() > 0.5);
-  modifyBuffer(bufferCenters, randomCenters);
+  modifyBuffer(bufferCenters, /** @type {ArrayLike<number>} */ randomCenters);
   instanceCount = randomCenters.length / 2;
   scheduleRender();
 }
