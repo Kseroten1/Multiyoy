@@ -1,39 +1,40 @@
 :root {
-  color-scheme: dark;
+    color-scheme: dark;
 }
 
 html, body {
-  height: 100%;
-  margin: 0;
+    height: 100%;
+    margin: 0;
   overscroll-behavior: none;
 }
 
 #main, #secondary {
-  height: 100dvh;
-  width: 100%;
-  display: block;
-  grid-area: 1 / 1;
+    height: 100dvh;
+    width: 100%;
+    display: block;
+    grid-area: 1 / 1;
 }
 
 #canvases {
-  display: grid;
+    display: grid;
+  /*pointer-events: none;*/ // TODO: Long click mobile, prevent without js
 }
 
 #ui-panel {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  z-index: 100;
-  background-color: rgba(30, 30, 30, 0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  border-radius: 12px;
-  padding: 20px;
-  width: 220px;
-  font-family: 'Segoe UI', sans-serif;
-  color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    background-color: rgba(30, 30, 30, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    padding: 20px;
+    width: 220px;
+    font-family: 'Segoe UI', sans-serif;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }

@@ -15,12 +15,12 @@ const vec2 HEX_OFFSETS[8] = vec2[](
 uniform mat4 u_mvp;
 
 in vec2 a_center;
-in float a_edgeMask;
-in float a_fillColorMask;
+in int a_edgeMask;
+in int a_fillColorMask;
 
 flat out int v_vertexID;
-flat out float v_edgeMask;
-flat out float v_fillColorMask;
+flat out int v_edgeMask;
+flat out int v_fillColorMask;
 out vec2 v_local;
 
 void main() {
