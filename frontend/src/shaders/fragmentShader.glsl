@@ -5,8 +5,8 @@ uniform vec3 EDGE_COLORS[6];
 uniform vec3 FILL_COLORS[14];
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
 
-flat in int v_edgeMask;  // maska krawedzi 
-flat in int v_fillColorMask;
+flat in float v_edgeMask;  // maska krawedzi 
+flat in float v_fillColorMask;
 flat in int v_vertexID;
 in vec2 v_local;
 
@@ -26,10 +26,10 @@ const vec2 HEX_OFFSETS[6] = vec2[](
     vec2(cos(radians(150.0)),  sin(radians(150.0)))  // V5 – lewy‑góra
 );
 
-int getBitAt(int mask, int index) {
-    int shifted = mask >> int(index); // przesuniecie bitowe w prawo
+float getBitAt(float mask, int index) {
+    int shifted = int(mask) >> int(index); // przesuniecie bitowe w prawo
     int hexSideMaskOn = shifted & 1; // operacja AND: 1 -> jeśli maska właczona, 0 jeśli wyłaczona
-    return int(hexSideMaskOn);
+    return float(hexSideMaskOn);
 }
 
 float pointRelativeDistanceFromLine(vec2 point, vec2 firstVertex, vec2 secondVertex) {
@@ -46,9 +46,10 @@ int wrapAround(int index){
 }
 
 void main() {
-    vec3 fillColorFirst = FILL_COLORS[v_fillColorMask & 0xF];
-    vec3 fillColorSecond = FILL_COLORS[(v_fillColorMask >> 4) & 0xF];
-    int isVertical = (v_fillColorMask >> 8) & 1;
+    int intFillColorMask = int(v_fillColorMask);
+    vec3 fillColorFirst = FILL_COLORS[intFillColorMask & 0xF];
+    vec3 fillColorSecond = FILL_COLORS[(intFillColorMask >> 4) & 0xF];
+    int isVertical = (intFillColorMask >> 8) & 1;
     float splitCoord = mix(v_local.y, v_local.x, float(isVertical));
     float t = step(0.0, splitCoord);
     vec3 baseFillColor = mix(fillColorFirst, fillColorSecond, t);
@@ -75,13 +76,13 @@ void main() {
         HEX_OFFSETS[wrapAround((nextEdgeID + 1))]
     );
 
-    int currentSideOn = getBitAt(v_edgeMask, edgeID);
-    int previousSideOn = getBitAt(v_edgeMask, previousEdgeID);
-    int nextSideOn = getBitAt(v_edgeMask, nextEdgeID);
+    float currentSideOn = getBitAt(v_edgeMask, edgeID);
+    float previousSideOn = getBitAt(v_edgeMask, previousEdgeID);
+    float nextSideOn = getBitAt(v_edgeMask, nextEdgeID);
 
-    float currentMask = float(currentSideOn) * step(distanceCurrent, u_borderWidth);
-    float prevMask = float(previousSideOn) * step(distancePrevious, u_borderWidth);
-    float nextMask = float(nextSideOn) * step(distanceNext, u_borderWidth);
+    float currentMask = currentSideOn * step(distanceCurrent, u_borderWidth);
+    float prevMask = previousSideOn * step(distancePrevious, u_borderWidth);
+    float nextMask = nextSideOn * step(distanceNext, u_borderWidth);
 
     vec3 color =
     baseFillColor * (1.0 - currentMask) * (1.0 - prevMask) * (1.0 - nextMask) +
