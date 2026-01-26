@@ -40,22 +40,22 @@ export function drawFrame() {
     gl.uniformMatrix3fv(layers.hex.locations.u_mvp, false, modelMatrix);
     gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, layers.hex.instanceCount);
 
-    layers.units.draw(modelMatrix, CONFIG.hexSize, state.brightness, state.saturation);
+    // layers.units.draw(modelMatrix, CONFIG.hexSize, state.brightness, state.saturation);
 
-    if (!state.hasMouse) {
-        return;
-    }
+    // if (!state.hasMouse) {
+    //     return;
+    // }
 
-    layers.highlight.updateCenters(new Float32Array(state.hlCenters));
-    gl2.useProgram(layers.highlight.program);
-    gl2.bindVertexArray(layers.highlight.vao);
-    gl2.uniformMatrix3fv(layers.highlight.locations.u_mvp, false, modelMatrix);
-    gl2.drawArraysInstanced(gl2.TRIANGLE_FAN, 0, 8, layers.highlight.instanceCount);
-
-    if (state.hlUnitTex.length > 0) {
-        layers.highlightUnits.updateData(new Float32Array(state.hlUnitPos), new Float32Array(state.hlUnitTex));
-        layers.highlightUnits.draw(modelMatrix, CONFIG.hexSize, state.brightness * 1.2, state.saturation);
-    }
+    // layers.highlight.updateCenters(new Float32Array(state.hlCenters));
+    // gl2.useProgram(layers.highlight.program);
+    // gl2.bindVertexArray(layers.highlight.vao);
+    // gl2.uniformMatrix3fv(layers.highlight.locations.u_mvp, false, modelMatrix);
+    // gl2.drawArraysInstanced(gl2.TRIANGLE_FAN, 0, 8, layers.highlight.instanceCount);
+    //
+    // if (state.hlUnitTex?.length > 0) {
+    //     layers.highlightUnits.updateData(new Float32Array(state.hlUnitPos), new Float32Array(state.hlUnitTex));
+    //     layers.highlightUnits.draw(modelMatrix, CONFIG.hexSize, state.brightness * 1.2, state.saturation);
+    // }
 }
 
 export function scheduleRender() {
@@ -77,3 +77,24 @@ export function resize() {
 
     scheduleRender();
 }
+
+// export function updateHexFills() {
+//     const R = CONFIG.hexRadius;
+//     const fills = [];
+//
+//     for (let q = -R; q <= R; q++) {
+//         for (let r = -R; r <= R; r++) {
+//             if (Math.abs(q + r) > R) continue;
+//
+//             const idx = getHexIndex(q, r);
+//             const ownerID = mapState.getHexOwner(idx);
+//             const provinceID = mapState.getHexProvince(idx);
+//
+//             // Tutaj tworzysz maskę koloru na podstawie danych z MapState
+//             // Możesz użyć np. ownerID jako koloru 1, a provinceID jako koloru 2
+//             fills.push(makeHexColorMask(ownerID % 14, provinceID % 14, 0));
+//         }
+//     }
+//
+//     layers.hex.updateFills(new Int32Array(fills));
+// }

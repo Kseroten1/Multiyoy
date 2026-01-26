@@ -1,8 +1,8 @@
 import {updateBrightnessAndSaturationMax} from "../utils/updateBrightnessAndSaturationMax.js";
 import {canvas, resize, scheduleRender, secondaryCanvas, updateHexColors} from "./renderer.js";
 import {state} from "./state.js";
-import {updateUnderPointerSelection, toggleUnitAtPointer} from "./mapLogic.js";
 import {COLOR_TABLE_FILL} from "../utils/config.js";
+import {updateUnderPointerSelection} from "./mapLogic.js";
 
 export async function setupEventHandlers() {
     const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
@@ -57,8 +57,8 @@ export async function setupEventHandlers() {
         
         const distancePower = (e.clientX - state.lastPosition.x) ** 2 + (e.clientY - state.lastPosition.y) ** 2;
         if (distancePower < 25) { //5px * 5px for avoiding sqrt 
-            toggleUnitAtPointer();
-            updateUnderPointerSelection();
+            // toggleUnitAtPointer();
+            // updateUnderPointerSelection();
             scheduleRender();
         }
         
@@ -80,7 +80,7 @@ export async function setupEventHandlers() {
         state.panOffset.x -= (mx - state.panOffset.x) * (eff - 1);
         state.panOffset.y -= (my - state.panOffset.y) * (eff - 1);
         state.scale = newScale;
-        updateUnderPointerSelection();
+        // updateUnderPointerSelection();
         scheduleRender();
     }, {passive: false});
 }

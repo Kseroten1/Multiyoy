@@ -11,7 +11,7 @@ flowchart LR
         D[Current round]:::navy
         E[Province count]:::pink
         F[Hex state]:::red
-        G[Hex color]:::violet
+        G[Hex owner]:::violet
         H[Province hex mapping]:::orange
         I[Max province finance]:::yellow
         J[Province finance state]:::darkgreen
@@ -88,8 +88,8 @@ flowchart LR
       <td>2,250,000 bytes</td>
     </tr>
     <tr>
-      <td><b>Hex color</b></td>
-      <td>⌈log₂(playerCount)⌉ × (hex count)</td>
+      <td><b>Hex owner</b></td>
+      <td>⌈log₂(playerCount)⌉ × (hex owner)</td>
       <td><code>bit-packed array</code></td>
       <td>
         Stores ownership of each hex.  

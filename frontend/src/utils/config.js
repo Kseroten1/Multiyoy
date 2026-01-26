@@ -1,5 +1,4 @@
 export const CONFIG = {
-    hexRadius: 600,
     hexSize: 1.0,
     defaultBorderWidth: 0.1,
     backgroundColor: [1.0, 1.0, 1.0, 1]

@@ -1,10 +1,18 @@
+import { MapStateManager } from './memory.js';
+import {MapState} from "./MapState.js";
+
+const HEX_COUNT = 250;
+const PLAYER_COUNT = 1500;
+
+export const mapState = new MapState(1500, 2_250_000);
+
 export const state = {
-    panOffset: {x: 0, y: 0},
+    panOffset: { x: 0, y: 0 },
     scale: 0.2,
     brightness: 1.0,
     saturation: 1.0,
     dragging: false,
-    lastPosition: {x: 0, y: 0},
+    lastPosition: { x: 0, y: 0 },
     activePointerId: -1,
     mouseX: 0,
     mouseY: 0,
@@ -24,5 +32,3 @@ export const layers = {
     highlight: null,
     highlightUnits: null
 };
-
-export const worldObjects = new Map();
