@@ -12,22 +12,24 @@ const vec2 HEX_OFFSETS[8] = vec2[](
     vec2(cos(radians(90.0)),   sin(radians(90.0)))    // powtórka V1 – domknięcie
 );
 
-uniform mat3 u_mvp;
-in vec2 u_center;
-in int u_edgeMask;
-in int u_fillColorMask;
+uniform mat4 u_mvp;
+
+in vec2 a_center;
+in float a_edgeMask;
+in float a_fillColorMask;
+
 flat out int v_vertexID;
-flat out int v_edgeMask;
-flat out int v_fillColorMask;
+flat out float v_edgeMask;
+flat out float v_fillColorMask;
 out vec2 v_local;
 
 void main() {
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
     v_vertexID = gl_VertexID;
-    v_edgeMask = u_edgeMask;
-    v_fillColorMask = u_fillColorMask;
+    v_edgeMask = a_edgeMask;
+    v_fillColorMask = a_fillColorMask;
     v_local = localPos;
-    vec2 modelPos = u_center + localPos;
-    vec3 clipPos = u_mvp * vec3(modelPos, 1.0);
+    vec2 modelPos = a_center + localPos;
+    vec4 clipPos = u_mvp * vec4(modelPos, 0.0, 1.0);
     gl_Position = vec4(clipPos.xy, 0.0, 1.0);
 }
