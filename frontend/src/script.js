@@ -5,6 +5,7 @@ import {generateAxialHexCenters, makeMask, makeHexColorMask} from './utils/math.
 import {createShader} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
+import {MapState} from "./utils/mapState.js";
 
 const state = {
   renderRequestId: null,
@@ -14,6 +15,7 @@ const CONFIG = {
   hexRadius: 600,
   hexSize: 1.0,
   defaultBorderWidth: 0.1,
+  playerCount: 1500
 };
 
 /** @type {HTMLInputElement} */
@@ -69,26 +71,42 @@ gl.uniform3fv(locations.fillColors, new Float32Array(fillRgb));
 gl.uniform3fv(locations.edgeColors, new Float32Array(edgeRgb));
 gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
 
-const hexagonPrecalculatedCenters = generateAxialHexCenters(CONFIG.hexRadius, CONFIG.hexSize);
-let instanceCount = hexagonPrecalculatedCenters.length / 2;
-const precalculatedFillMask = Array.from({length: instanceCount}, () => makeHexColorMask(1, 1, false));
-const precalculatedEdgeMasks = Array.from({length: instanceCount}, () => makeMask(EDGE_MASKS[0]));
+//const hexagonPrecalculatedCenters = generateAxialHexCenters(CONFIG.hexRadius, CONFIG.hexSize);
+const totalHexCount = 3 * CONFIG.hexRadius * (CONFIG.hexRadius + 1) + 1;
+console.log(totalHexCount);
+const mapState = new MapState(CONFIG.playerCount, totalHexCount);
+let index = 0;
+
+for (let q = -CONFIG.hexRadius; q <= CONFIG.hexRadius; q++) {
+  for (let r = -CONFIG.hexRadius; r <= CONFIG.hexRadius; r++) {
+    if (Math.abs(q + r) > CONFIG.hexRadius) continue;
+    mapState.setHexState(index, 0, q, r);
+
+    index++;
+  }
+}
+let instanceCount = index;
+// const precalculatedFillMask = Array.from({length: instanceCount}, () => makeHexColorMask(1, 1, false));
+// const precalculatedEdgeMasks = Array.from({length: instanceCount}, () => makeMask(EDGE_MASKS[0]));
 
 const bufferCenters = initBuffer(
   locations.center,
-  /** @type {ArrayLike<number>} */ hexagonPrecalculatedCenters,
+  ///** @type {ArrayLike<number>} */ hexagonPrecalculatedCenters,
+  mapState.arrayForHexRenderer,
   2,
 );
   
 const bufferFill = initBuffer(
   locations.fillColorMask,
-  /** @type {ArrayLike<number>} */ precalculatedFillMask,
+  ///** @type {ArrayLike<number>} */ precalculatedFillMask,
+  mapState.fillMasksArray,
   1,
 );
 
 const bufferEdge = initBuffer(
   locations.edgeMask,
-  /** @type {ArrayLike<number>} */ precalculatedEdgeMasks,
+  ///** @type {ArrayLike<number>} */ precalculatedEdgeMasks,
+  mapState.edgeMasksArray,
   1,
 );
 
@@ -214,16 +232,16 @@ function initEventHandlers() {
   sInput.addEventListener("input", onInputChange);
 }
 
-for (let i = 0; i < 1000; i++) {
-  // await new Promise(r => setTimeout(r, 100));
-  // console.log("Lowering hex count to first 1k");
-  // instanceCount = 1000;
-  // scheduleRender();
-
-  await new Promise(r => setTimeout(r, 10));
-  console.log("Changing hexagon centers to random 50%");
-  const randomCenters = hexagonPrecalculatedCenters.filter(() => Math.random() > 0.5);
-  modifyBuffer(bufferCenters, /** @type {ArrayLike<number>} */ randomCenters);
-  instanceCount = randomCenters.length / 2;
-  scheduleRender();
-}
+// for (let i = 0; i < 1000; i++) {
+//   // await new Promise(r => setTimeout(r, 100));
+//   // console.log("Lowering hex count to first 1k");
+//   // instanceCount = 1000;
+//   // scheduleRender();
+//
+//   await new Promise(r => setTimeout(r, 10));
+//   console.log("Changing hexagon centers to random 50%");
+//   const randomCenters = hexagonPrecalculatedCenters.filter(() => Math.random() > 0.5);
+//   modifyBuffer(bufferCenters, /** @type {ArrayLike<number>} */ randomCenters);
+//   instanceCount = randomCenters.length / 2;
+//   scheduleRender();
+// }
