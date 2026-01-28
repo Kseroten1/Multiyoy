@@ -12,7 +12,7 @@ const state = {
 };
 
 const CONFIG = {
-  hexRadius: 600,
+  hexRadius: 3,
   hexSize: 1.0,
   defaultBorderWidth: 0.1,
   playerCount: 1500
@@ -71,28 +71,30 @@ gl.uniform3fv(locations.fillColors, new Float32Array(fillRgb));
 gl.uniform3fv(locations.edgeColors, new Float32Array(edgeRgb));
 gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
 
-//const hexagonPrecalculatedCenters = generateAxialHexCenters(CONFIG.hexRadius, CONFIG.hexSize);
-const totalHexCount = 3 * CONFIG.hexRadius * (CONFIG.hexRadius + 1) + 1;
-console.log(totalHexCount);
-const mapState = new MapState(CONFIG.playerCount, totalHexCount);
-let index = 0;
+/// GENERATE - BEGIN
+const mapState = new MapState(CONFIG.playerCount, 100);
 
-for (let q = -CONFIG.hexRadius; q <= CONFIG.hexRadius; q++) {
-  for (let r = -CONFIG.hexRadius; r <= CONFIG.hexRadius; r++) {
-    if (Math.abs(q + r) > CONFIG.hexRadius) continue;
-    mapState.setHexState(index, 0, q, r);
+const R = 2;
+const cq = 5;
+const cr = 5;
+for (let dq = -R; dq <= R; dq++) {
+  // For a fixed dq, dr is constrained so that distance <= R
+  const drMin = Math.max(-R, -dq - R);
+  const drMax = Math.min(R, -dq + R);
 
-    index++;
+  for (let dr = drMin; dr <= drMax; dr++) {
+    const q = cq + dq;
+    const r = cr + dr;
+    mapState.setHexStateAxial(q, r, 1);
   }
 }
-let instanceCount = index;
-// const precalculatedFillMask = Array.from({length: instanceCount}, () => makeHexColorMask(1, 1, false));
-// const precalculatedEdgeMasks = Array.from({length: instanceCount}, () => makeMask(EDGE_MASKS[0]));
 
+// GENERATE - END
+
+const hexagonsToRender = mapState.hexagonsToRender;
 const bufferCenters = initBuffer(
   locations.center,
-  ///** @type {ArrayLike<number>} */ hexagonPrecalculatedCenters,
-  mapState.arrayForHexRenderer,
+  hexagonsToRender,
   2,
 );
   
@@ -117,7 +119,7 @@ initEventHandlers();
 /**
  * 
  * @param location {GLuint}
- * @param data {ArrayLike<number>}
+ * @param data {ArrayBufferLike | ArrayBufferView<ArrayBufferLike>}
  * @param size {Number}
  * @returns {WebGLBuffer}
  */
@@ -126,7 +128,7 @@ function initBuffer(location, data, size) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.enableVertexAttribArray(location);
   gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
   gl.vertexAttribDivisor(location, 1);
   return buffer;
 }
@@ -147,7 +149,7 @@ function draw() {
   gl.bindVertexArray(vao);
   const mvp = projectionMatrix.multiply(viewMatrix);
   gl.uniformMatrix4fv(locations.mvp, false, mvp.toFloat32Array());
-  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, instanceCount);
+  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, hexagonsToRender.length / 2);
 }
 
 function scheduleRender() {
@@ -170,23 +172,29 @@ function initEventHandlers() {
   const lastPosition = { x: 0, y: 0 };
   
   canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
-
-    const zoomSpeed = 0.001;
-    const factor = Math.exp(-e.deltaY * zoomSpeed);
-    const viewCenterX = window.innerWidth / 2;
-    const viewCenterY = window.innerHeight / 2;
-
-    const x = e.clientX - viewCenterX;
-    const y = e.clientY - viewCenterY;
     
-    const zoomMatrix = new DOMMatrix()
-      .translate(x, y)
-      .scale(factor)
-      .translate(-x, -y);
+    if (e.ctrlKey) {
+      const zoomSpeed = 0.01;
+      const factor = Math.exp(-e.deltaY * zoomSpeed);
+      const viewCenterX = window.innerWidth / 2;
+      const viewCenterY = window.innerHeight / 2;
+
+      const x = e.clientX - viewCenterX;
+      const y = e.clientY - viewCenterY;
+
+      const zoomMatrix = new DOMMatrix()
+        .translate(x, y)
+        .scale(factor)
+        .translate(-x, -y);
+
+      viewMatrix.preMultiplySelf(zoomMatrix);
+    } else {
+      viewMatrix.translateSelf(-e.deltaX / viewMatrix.a, -e.deltaY / viewMatrix.d);
+    }
     
-    viewMatrix.preMultiplySelf(zoomMatrix);
     scheduleRender();
   }, { passive: false });
 

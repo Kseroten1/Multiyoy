@@ -1,6 +1,6 @@
-import {ExtendedDataView} from "./ExtendedDataView.js";
-import {axialToCenter, makeHexColorMask, makeMask} from "./math.js";
-import {EDGE_MASKS} from "./config.js";
+import { ExtendedDataView } from "./ExtendedDataView.js";
+import { makeHexColorMask, makeMask } from "./math.js";
+import { EDGE_MASKS } from "./config.js";
 
 function calculateMapStateDimensions(playerCount, hexCount) {
   const provinceCount = hexCount / 4;
@@ -63,7 +63,6 @@ function calculateMapStateDimensions(playerCount, hexCount) {
 
 export class MapState extends Uint8Array {
   dataView = new ExtendedDataView(this.buffer)
-
   dimensions
   
   calculatedFillMasks = new Map(); //dodane
@@ -76,16 +75,38 @@ export class MapState extends Uint8Array {
     this.dimensions = dimensions;
 
     this.playerCount = playerCount;
-    this.hexCount = hexCount;
-
+    this.#cachedHexCount = hexCount;
   }
-
+  
+  #cachedHexCount;
   get hexCount() {
-    return this.dataView.getNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes);
+    this.#cachedHexCount ??= this.dataView.getNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes);
+    return this.#cachedHexCount;
+  }
+  
+  #mapWidth;
+  get mapWidth() {
+    this.#mapWidth ??= Math.sqrt(this.hexCount);
+    return this.#mapWidth;
   }
 
-  set hexCount(number) {
-    this.dataView.setNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes, number);
+  indexToAxial(index) {
+    const col = index % this.mapWidth;
+    const row = Math.floor(index / this.mapWidth);
+
+    // odd-r offset -> axial (pointy-top)
+    const q = col - Math.floor((row - (row & 1)) / 2);
+    const r = row;
+
+    return { q, r };
+  }
+
+  axialToIndex(q, r) {
+    const width = this.mapWidth;
+
+    // axial -> odd-r offset (pointy-top)
+    const col = q + Math.floor((r - (r & 1)) / 2);
+    return r * width + col;
   }
 
   get playerCount() {
@@ -120,8 +141,10 @@ export class MapState extends Uint8Array {
     this.dataView.setNumber(this.dimensions.provinceCountOffset, this.dimensions.provinceCountInBytes, value);
   }
 
+  #hexStates;
   get hexStates() {
-    return new Uint8Array(this.buffer, this.dimensions.hexStateOffset, this.dimensions.hexStateInBytesPerElement * this.hexCount);
+    this.#hexStates ??= new Uint8Array(this.buffer, this.dimensions.hexStateOffset, this.dimensions.hexStateInBytesPerElement * this.hexCount);
+    return this.#hexStates;
   }
 
   set hexStates(value) {
@@ -131,12 +154,14 @@ export class MapState extends Uint8Array {
   getHexState(index) {
     return this.hexStates[index];
   }
+  
+  setHexStateAxial(q, r, value) {
+    const index = this.axialToIndex(q, r);
+    this.setHexState(index, value);
+  }
 
-  setHexState(index, value, q, r) {
+  setHexState(index, value) {
     this.hexStates[index] = value;
-
-    const calculateCenter = axialToCenter(q, r, 1);
-    this.calculatedCenters.set(index, calculateCenter);
 
     const fillMask = makeHexColorMask(1, 1, false); //dodane
     this.calculatedFillMasks.set(index, fillMask); //dodane
@@ -201,9 +226,21 @@ export class MapState extends Uint8Array {
     this.provinceFinanceStates[index] = value;
   }
 
-  get arrayForHexRenderer() {
-    // odczytuje ze stanu index => qr qr => xehCenter, zwroc 
-    return new Float32Array(this.calculatedCenters.values().flatMap(x => x));
+  /** @type {Float32Array} */
+  get hexagonsToRender() {
+    const centersToRender = Array.from({length: this.hexCount}, (_, index) => {
+      // Do not render hexagons on "water"
+      if (this.hexStates[index] === 0) return /** @type {[number, number]} */ [];
+      
+      const { q, r } = this.indexToAxial(index);
+
+      const x = Math.sqrt(3) * (q + r / 2);
+      const y = (3 / 2) * r;
+      
+      return [x, y];
+    });
+    
+    return new Float32Array(centersToRender.flat());
   }
 
   get fillMasksArray() {  //dodane
