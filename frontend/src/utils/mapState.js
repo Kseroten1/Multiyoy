@@ -1,6 +1,8 @@
 import {ExtendedDataView} from "./ExtendedDataView.js";
-import {axialToCenter, makeHexColorMask, makeMask} from "./math.js";
+import {axialToCenter, generateAxialHexCenters, makeHexColorMask, makeMask} from "./math.js";
 import {EDGE_MASKS} from "./config.js";
+import {CONFIG, selectedMapWidth} from "../script.js";
+import {decodeMorton, encodeMorton} from "./mortonCode.js";
 
 function calculateMapStateDimensions(playerCount, hexCount) {
   const provinceCount = hexCount / 4;
@@ -132,11 +134,9 @@ export class MapState extends Uint8Array {
     return this.hexStates[index];
   }
 
-  setHexState(index, value, q, r) {
+  setHexState(q, r, value) {
+    let index = encodeMorton(q, r, selectedMapWidth);
     this.hexStates[index] = value;
-
-    const calculateCenter = axialToCenter(q, r, 1);
-    this.calculatedCenters.set(index, calculateCenter);
 
     const fillMask = makeHexColorMask(1, 1, false); //dodane
     this.calculatedFillMasks.set(index, fillMask); //dodane
@@ -200,12 +200,18 @@ export class MapState extends Uint8Array {
   setProvinceFinanceState(index, value) {
     this.provinceFinanceStates[index] = value;
   }
-
+  
   get arrayForHexRenderer() {
-    // odczytuje ze stanu index => qr qr => xehCenter, zwroc 
-    return new Float32Array(this.calculatedCenters.values().flatMap(x => x));
+    // odczytuje ze stanu index => qr qr => xehCenter, zwroc
+    const centers = [];
+    for (let i = 0; i < this.hexCount; i++) {
+      if (this.getHexState(i) === 0) continue;
+      const decoded = decodeMorton(i, selectedMapWidth);
+      centers.push(...axialToCenter(decoded.q - Math.floor(decoded.r / 2), decoded.r, CONFIG.hexSize));
+    }
+    return new Float32Array(centers);
   }
-
+  
   get fillMasksArray() {  //dodane
     return new Float32Array(this.calculatedFillMasks.values());  //dodane
   }  //dodane
