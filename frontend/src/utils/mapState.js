@@ -1,8 +1,8 @@
 import {ExtendedDataView} from "./ExtendedDataView.js";
-import {axialToCenter, generateAxialHexCenters, makeHexColorMask, makeMask} from "./math.js";
+import {axialToCenter, makeHexColorMask, makeMask} from "./math.js";
 import {EDGE_MASKS} from "./config.js";
-import {CONFIG, selectedMapWidth} from "../script.js";
-import {decodeMorton, encodeMorton} from "./mortonCode.js";
+import {selectedMapWidth} from "../script.js";
+import {decodeRowMajor, encodeRowMajor} from "./rowMajor.js";
 
 function calculateMapStateDimensions(playerCount, hexCount) {
   const provinceCount = hexCount / 4;
@@ -135,7 +135,11 @@ export class MapState extends Uint8Array {
   }
 
   setHexState(q, r, value) {
-    let index = encodeMorton(q, r, selectedMapWidth);
+    let index = encodeRowMajor(q , r, selectedMapWidth);
+    this.setHexStateIndex(index, value);
+  }
+  
+  setHexStateIndex(index, value) {
     this.hexStates[index] = value;
 
     const fillMask = makeHexColorMask(1, 1, false); //dodane
@@ -206,8 +210,8 @@ export class MapState extends Uint8Array {
     const centers = [];
     for (let i = 0; i < this.hexCount; i++) {
       if (this.getHexState(i) === 0) continue;
-      const decoded = decodeMorton(i, selectedMapWidth);
-      centers.push(...axialToCenter(decoded.q - Math.floor(decoded.r / 2), decoded.r, CONFIG.hexSize));
+      const decoded = decodeRowMajor(i, selectedMapWidth);
+      centers.push(...axialToCenter(decoded.q , decoded.r));
     }
     return new Float32Array(centers);
   }

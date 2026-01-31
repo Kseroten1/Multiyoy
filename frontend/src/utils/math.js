@@ -1,18 +1,17 @@
 /**
  * @param q
  * @param r
- * @param size
  * @returns {number[x,y]}
  */
-export function axialToCenter(q, r, size) {
-  const x = size * Math.sqrt(3) * (q + r / 2);
-  const y = size * (3 / 2) * r;
+export function axialToCenter(q, r) {
+  const x = Math.sqrt(3) * (q + r / 2);
+  const y = (3 / 2) * r;
   return [x, y];
 }
 
-export function pixelToAxial(x, y, size) {
-  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * y) / size;
-  const r = (2 / 3 * y) / size;
+export function pixelToAxial(x, y) {
+  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * y);
+  const r = (2 / 3 * y);
   return [q, r];
 }
 
@@ -38,24 +37,6 @@ export function hexRound(q, r) {
   }
 
   return [rx, rz];
-}
-
-/**
- *
- * @param radius
- * @param size
- * @returns {number[]} Flat array of [x1,y1,x2,y2,...]
- */
-export function generateAxialHexCenters(radius, size) {
-  /** @type {number[]} */
-  const centers = [];
-  for (let q = -radius; q <= radius; q++) {
-    for (let r = -radius; r <= radius; r++) {
-      if (Math.abs(q + r) > radius) continue;
-      centers.push(...axialToCenter(q, r, size));
-    }
-  }
-  return centers;
 }
 
 /**

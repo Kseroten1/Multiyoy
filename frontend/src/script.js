@@ -10,7 +10,6 @@ const state = {
 };
 
 export const CONFIG = {
-  hexSize: 1.0,
   defaultBorderWidth: 0.1,
   playerCount: 1500
 };
@@ -83,11 +82,17 @@ gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
 
 const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
-for (let q = -selectedMapWidth; q < selectedMapWidth; q++) {
-  for (let r = -selectedMapWidth; r < selectedMapWidth; r++) {
-    mapState.setHexState(q, r, 1);
-  }
+// for (let q = 0; q < 100; q++) {
+//   for (let r = 0; r < 100; r++) {
+//    mapState.setHexState(q , r, 1);
+//   }
+// }
+// to daje romb
+
+for (let i = 0; i < selectedMapWidth ** 2; i ++) {
+  mapState.setHexStateIndex(i, 1);
 }
+//to daje kwadrat 
 
 const centers = mapState.arrayForHexRenderer;
 
