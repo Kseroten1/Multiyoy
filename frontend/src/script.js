@@ -5,9 +5,13 @@ import {createShader} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
+import {generateMap} from "./utils/mapGenerator.js";
 const state = {
   renderRequestId: null,
 };
+
+let centers = new Float32Array(0);
+let bufferCenters, bufferFill, bufferEdge;
 
 export const CONFIG = {
   defaultBorderWidth: 0.1,
@@ -25,16 +29,26 @@ const mapWidth = {
   LIFETIME: 2048
 };
 
-export const selectedMapWidth = mapWidth.EXTRA;
+export const selectedMapWidth = mapWidth.LARGE;
 
 /** @type {HTMLInputElement} */
 const bInput = document.getElementById("brightness");
 /** @type {HTMLInputElement} */
 const sInput = document.getElementById("saturation");
+/** @type {HTMLInputElement} */
+const freqInput = document.getElementById("baseFrequency");
+/** @type {HTMLInputElement} */
+const octavesInput = document.getElementById("numOctaves");
+/** @type {HTMLInputElement} */
+const seedInput = document.getElementById("seed");
+/** @type {HTMLInputElement} */
+const thresholdInput = document.getElementById("threshold");
 
 const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
 bInput.max = maxB;
 sInput.max = maxS;
+
+seedInput.value = Math.floor(Math.random() * 1000);
 
 const canvas = document.getElementById("main");
 /** @type {WebGL2RenderingContext} */
@@ -43,7 +57,7 @@ const gl = canvas.getContext("webgl2", {colorSpace: "display-p3"});
  * Used for controls related calculations (camera origin, zoom, pan)
  * @type {DOMMatrix}
  */
-const viewMatrix = new DOMMatrix().scaleSelf(15);
+const viewMatrix = new DOMMatrix().scaleSelf(4);
 /**
  * Used for window related calculations (window size, device pixel ratio)
  * @type {DOMMatrix}
@@ -82,40 +96,61 @@ gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
 
 const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
-// for (let q = 0; q < 100; q++) {
-//   for (let r = 0; r < 100; r++) {
-//    mapState.setHexState(q , r, 1);
-//   }
-// }
-// to daje romb
+async function updateMap(isInitial = false) {
+  document.getElementById("val-baseFrequency").textContent = freqInput.value;
+  document.getElementById("val-numOctaves").textContent = octavesInput.value;
+  document.getElementById("val-seed").textContent = seedInput.value;
+  document.getElementById("val-threshold").textContent = thresholdInput.value;
 
-for (let i = 0; i < selectedMapWidth ** 2; i ++) {
-  mapState.setHexStateIndex(i, 1);
+  mapState.reset();
+  const mapData = await generateMap(selectedMapWidth, {
+    baseFrequency: parseFloat(freqInput.value),
+    numOctaves: parseInt(octavesInput.value),
+    seed: parseInt(seedInput.value),
+    threshold: parseFloat(thresholdInput.value)
+  });
+
+  for (let i = 0; i < selectedMapWidth ** 2; i++) {
+    if (mapData[i] === 1) {
+      mapState.setHexStateIndex(i, 1);
+    }
+  }
+
+  centers = mapState.arrayForHexRenderer;
+
+  if (isInitial && centers.length > 0) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < centers.length; i += 2) {
+      const x = centers[i];
+      const y = centers[i + 1];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    viewMatrix.translateSelf(-centerX, -centerY);
+  }
+
+  if (!bufferCenters) {
+    bufferCenters = initBuffer(locations.center, centers, 2);
+    bufferFill = initBuffer(locations.fillColorMask, mapState.fillMasksArray, 1);
+    bufferEdge = initBuffer(locations.edgeMask, mapState.edgeMasksArray, 1);
+  } else {
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCenters);
+    gl.bufferData(gl.ARRAY_BUFFER, centers, gl.DYNAMIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferFill);
+    gl.bufferData(gl.ARRAY_BUFFER, mapState.fillMasksArray, gl.DYNAMIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferEdge);
+    gl.bufferData(gl.ARRAY_BUFFER, mapState.edgeMasksArray, gl.DYNAMIC_DRAW);
+  }
+  scheduleRender();
 }
-//to daje kwadrat 
 
-const centers = mapState.arrayForHexRenderer;
-
-const bufferCenters = initBuffer(
-  locations.center,
-  ///** @type {ArrayLike<number>} */ hexagonPrecalculatedCenters,
-  centers,
-  2,
-);
-  
-const bufferFill = initBuffer(
-  locations.fillColorMask,
-  ///** @type {ArrayLike<number>} */ precalculatedFillMask,
-  mapState.fillMasksArray,
-  1,
-);
-
-const bufferEdge = initBuffer(
-  locations.edgeMask,
-  ///** @type {ArrayLike<number>} */ precalculatedEdgeMasks,
-  mapState.edgeMasksArray,
-  1,
-);
+await updateMap(true);
 
 onResize();
 scheduleRender();
@@ -175,25 +210,31 @@ function onResize() {
 function initEventHandlers() {
   let dragging = false;
   const lastPosition = { x: 0, y: 0 };
-  
+
   canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
 
-    const zoomSpeed = 0.001;
-    const factor = Math.exp(-e.deltaY * zoomSpeed);
-    const viewCenterX = window.innerWidth / 2;
-    const viewCenterY = window.innerHeight / 2;
+    if (e.ctrlKey) {
+      const zoomSpeed = 0.01;
+      const factor = Math.exp(-e.deltaY * zoomSpeed);
+      const viewCenterX = window.innerWidth / 2;
+      const viewCenterY = window.innerHeight / 2;
 
-    const x = e.clientX - viewCenterX;
-    const y = e.clientY - viewCenterY;
-    
-    const zoomMatrix = new DOMMatrix()
-      .translate(x, y)
-      .scale(factor)
-      .translate(-x, -y);
-    
-    viewMatrix.preMultiplySelf(zoomMatrix);
+      const x = e.clientX - viewCenterX;
+      const y = e.clientY - viewCenterY;
+
+      const zoomMatrix = new DOMMatrix()
+        .translate(x, y)
+        .scale(factor)
+        .translate(-x, -y);
+
+      viewMatrix.preMultiplySelf(zoomMatrix);
+    } else {
+      viewMatrix.translateSelf(-e.deltaX / viewMatrix.a, -e.deltaY / viewMatrix.d);
+    }
+
     scheduleRender();
   }, { passive: false });
 
@@ -230,6 +271,8 @@ function initEventHandlers() {
   window.addEventListener("resize", onResize);
   
   function onInputChange() {
+    document.getElementById("val-brightness").textContent = bInput.value;
+    document.getElementById("val-saturation").textContent = sInput.value;
     gl.uniform3fv(locations.fillColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL));
     gl.uniform3fv(locations.edgeColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_EDGE));
     scheduleRender();
@@ -237,6 +280,11 @@ function initEventHandlers() {
   
   bInput.addEventListener("input", onInputChange);
   sInput.addEventListener("input", onInputChange);
+  onInputChange();
+  freqInput.addEventListener("input", () => updateMap());
+  octavesInput.addEventListener("input", () => updateMap());
+  seedInput.addEventListener("input", () => updateMap());
+  thresholdInput.addEventListener("input", () => updateMap());
 }
 
 // for (let i = 0; i < 1000; i++) {

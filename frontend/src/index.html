@@ -10,11 +10,24 @@
 <body>
 <main>
     <section id="ui-panel">
-        <label>Brightness
+        <label>Brightness: <span id="val-brightness">1</span>
             <input id="brightness" type="range" min="0.4" step="0.01" value="1">
         </label>
-        <label>Saturation
+        <label>Saturation: <span id="val-saturation">1</span>
             <input id="saturation" type="range" min="0.3" step="0.01" value="1">
+        </label>
+        <hr>
+        <label>Base Frequency: <span id="val-baseFrequency">0.05</span>
+            <input id="baseFrequency" type="range" min="0.001" max="0.2" step="0.001" value="0.05">
+        </label>
+        <label>Octaves: <span id="val-numOctaves">4</span>
+            <input id="numOctaves" type="range" min="1" max="10" step="1" value="4">
+        </label>
+        <label>Seed: <span id="val-seed">0</span>
+            <input id="seed" type="range" min="0" max="1000" step="1" value="0">
+        </label>
+        <label>Threshold: <span id="val-threshold">0.45</span>
+            <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.45">
         </label>
     </section>
     <section id="canvases">

@@ -82,6 +82,12 @@ export class MapState extends Uint8Array {
 
   }
 
+  reset() {
+    this.hexStates.fill(0);
+    this.calculatedFillMasks.clear();
+    this.calculatedEdgeMasks.clear();
+  }
+  
   get hexCount() {
     return this.dataView.getNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes);
   }
