@@ -44,6 +44,12 @@
         <label>Threshold: <span id="val-threshold">0.45</span>
             <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.45">
         </label>
+        <label>Dilate (SVG Filter): <span id="val-dilate">0</span>
+            <input id="dilate" type="range" min="0" max="10" step="1" value="0">
+        </label>
+        <label>Ensure Connected:
+            <input id="connected" type="checkbox">
+        </label>
     </section>
     <section id="canvases">
         <canvas id="main"></canvas>

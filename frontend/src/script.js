@@ -51,6 +51,10 @@ const ridgeInput = document.getElementById("ridge");
 const islandInput = document.getElementById("island");
 /** @type {HTMLInputElement} */
 const thresholdInput = document.getElementById("threshold");
+/** @type {HTMLInputElement} */
+const dilateInput = document.getElementById("dilate");
+/** @type {HTMLInputElement} */
+const connectedInput = document.getElementById("connected");
 
 const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
 bInput.max = maxB;
@@ -113,6 +117,7 @@ async function updateMap(isInitial = false) {
   document.getElementById("val-blur").textContent = blurInput.value;
   document.getElementById("val-ridge").textContent = ridgeInput.value;
   document.getElementById("val-island").textContent = islandInput.value;
+  document.getElementById("val-dilate").textContent = dilateInput.value;
 
   mapState.reset();
   const mapData = await generateMap(selectedMapWidth, {
@@ -123,7 +128,9 @@ async function updateMap(isInitial = false) {
     type: typeInput.value,
     blur: parseFloat(blurInput.value),
     ridge: parseFloat(ridgeInput.value),
-    island: parseFloat(islandInput.value)
+    island: parseFloat(islandInput.value),
+    dilate: parseFloat(dilateInput.value),
+    connected: connectedInput.checked
   });
 
   for (let i = 0; i < selectedMapWidth ** 2; i++) {
@@ -305,6 +312,8 @@ function initEventHandlers() {
   ridgeInput.addEventListener("input", () => updateMap());
   islandInput.addEventListener("input", () => updateMap());
   thresholdInput.addEventListener("input", () => updateMap());
+  dilateInput.addEventListener("input", () => updateMap());
+  connectedInput.addEventListener("change", () => updateMap());
 }
 
 // for (let i = 0; i < 1000; i++) {
