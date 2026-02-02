@@ -41,6 +41,14 @@ const freqInput = document.getElementById("baseFrequency");
 const octavesInput = document.getElementById("numOctaves");
 /** @type {HTMLInputElement} */
 const seedInput = document.getElementById("seed");
+/** @type {HTMLSelectElement} */
+const typeInput = document.getElementById("type");
+/** @type {HTMLInputElement} */
+const blurInput = document.getElementById("blur");
+/** @type {HTMLInputElement} */
+const ridgeInput = document.getElementById("ridge");
+/** @type {HTMLInputElement} */
+const islandInput = document.getElementById("island");
 /** @type {HTMLInputElement} */
 const thresholdInput = document.getElementById("threshold");
 
@@ -101,13 +109,21 @@ async function updateMap(isInitial = false) {
   document.getElementById("val-numOctaves").textContent = octavesInput.value;
   document.getElementById("val-seed").textContent = seedInput.value;
   document.getElementById("val-threshold").textContent = thresholdInput.value;
+  document.getElementById("val-type").textContent = typeInput.value;
+  document.getElementById("val-blur").textContent = blurInput.value;
+  document.getElementById("val-ridge").textContent = ridgeInput.value;
+  document.getElementById("val-island").textContent = islandInput.value;
 
   mapState.reset();
   const mapData = await generateMap(selectedMapWidth, {
     baseFrequency: parseFloat(freqInput.value),
     numOctaves: parseInt(octavesInput.value),
     seed: parseInt(seedInput.value),
-    threshold: parseFloat(thresholdInput.value)
+    threshold: parseFloat(thresholdInput.value),
+    type: typeInput.value,
+    blur: parseFloat(blurInput.value),
+    ridge: parseFloat(ridgeInput.value),
+    island: parseFloat(islandInput.value)
   });
 
   for (let i = 0; i < selectedMapWidth ** 2; i++) {
@@ -284,6 +300,10 @@ function initEventHandlers() {
   freqInput.addEventListener("input", () => updateMap());
   octavesInput.addEventListener("input", () => updateMap());
   seedInput.addEventListener("input", () => updateMap());
+  typeInput.addEventListener("input", () => updateMap());
+  blurInput.addEventListener("input", () => updateMap());
+  ridgeInput.addEventListener("input", () => updateMap());
+  islandInput.addEventListener("input", () => updateMap());
   thresholdInput.addEventListener("input", () => updateMap());
 }
 

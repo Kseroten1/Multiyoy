@@ -32,6 +32,8 @@ html, body {
   border-radius: 12px;
   padding: 20px;
   width: 220px;
+  max-height: 90vh;
+  overflow-y: auto;
   font-family: 'Segoe UI', sans-serif;
   color: #ffffff;
   display: flex;

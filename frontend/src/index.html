@@ -26,6 +26,21 @@
         <label>Seed: <span id="val-seed">0</span>
             <input id="seed" type="range" min="0" max="1000" step="1" value="0">
         </label>
+        <label>Noise Type: <span id="val-type">turbulence</span>
+            <select id="type">
+                <option value="turbulence">Turbulence</option>
+                <option value="fractalNoise">Fractal</option>
+            </select>
+        </label>
+        <label>Blur: <span id="val-blur">0</span>
+            <input id="blur" type="range" min="0" max="10" step="0.1" value="0">
+        </label>
+        <label>Ridge: <span id="val-ridge">0</span>
+            <input id="ridge" type="range" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label>Island Mask: <span id="val-island">0</span>
+            <input id="island" type="range" min="0" max="1" step="0.01" value="0">
+        </label>
         <label>Threshold: <span id="val-threshold">0.45</span>
             <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.45">
         </label>

@@ -15,19 +15,38 @@ export async function generateMap(width, {
   numOctaves = 1,
   seed = 0,
   type = 'turbulence',
-  threshold = 0.5
+  threshold = 0.5,
+  blur = 0,
+  ridge = 0,
+  island = 0
 } = {}) {
   const svg = `
     <svg width="${width}" height="${width}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="islandGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="white" />
+          <stop offset="100%" stop-color="black" />
+        </radialGradient>
+      </defs>
       <filter id="noise" x="0" y="0" width="100%" height="100%">
         <feTurbulence 
           type="${type}" 
           baseFrequency="${baseFrequency}" 
           numOctaves="${numOctaves}" 
           seed="${seed}" 
+          result="raw"
         />
+        <feGaussianBlur in="raw" stdDeviation="${blur}" result="blurred" />
+        
+        <feComponentTransfer in="blurred" result="ridged">
+          <feFuncR type="table" tableValues="0 1 0" />
+        </feComponentTransfer>
+        
+        <feComposite in="blurred" in2="ridged" operator="arithmetic" k2="${1 - ridge}" k3="${ridge}" result="combined" />
+        
+        <feComposite in="combined" in2="SourceGraphic" operator="arithmetic" k1="${island}" k2="${1 - island}" />
       </filter>
-      <rect width="100%" height="100%" filter="url(#noise)" />
+      <rect width="100%" height="100%" fill="url(#islandGrad)" filter="url(#noise)" />
     </svg>
   `;
 
