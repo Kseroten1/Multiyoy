@@ -1,156 +1,98 @@
-import { decodeRowMajor } from './rowMajor.js';
+import { decodeRowMajor, encodeRowMajor } from './rowMajor.js';
 
 /**
- * Generates a map using SVG built-in Perlin noise (feTurbulence).
+ * Generates a map using a random walk algorithm.
  * 
  * @param {number} width - The width of the map (corresponds to selectedMapWidth).
- * @param {object} options - SVG filter options.
- * @param {number|string} [options.baseFrequency=0.05] - The base frequency for feTurbulence.
- * @param {number} [options.numOctaves=1] - The number of octaves for feTurbulence.
- * @param {number} [options.seed=0] - The seed for feTurbulence.
- * @param {string} [options.type='turbulence'] - The type of noise ('turbulence' or 'fractalNoise').
- * @param {number} [options.threshold=0.5] - The threshold value (0-1) to determine if a hexagon is present.
- * @param {number} [options.blur=0] - The blur radius.
- * @param {number} [options.ridge=0] - The ridge intensity (0-1).
- * @param {number} [options.island=0] - The island intensity (0-1).
- * @param {number} [options.dilate=0] - The dilation radius (feMorphology).
- * @param {boolean} [options.connected=false] - Whether to ensure only the largest connected component is kept.
+ * @param {object} options - Generation options.
+ * @param {number} [options.totalHexagons=1000] - The target number of hexagons in the map.
+ * @param {number} [options.numBatches=1] - The number of batches to walk.
  * @returns {Promise<Uint8Array>} A promise that resolves to a Uint8Array of size width**2 with 1s and 0s.
  */
 export async function generateMap(width, {
-  baseFrequency = 0.05,
-  numOctaves = 1,
-  seed = 0,
-  type = 'turbulence',
-  threshold = 0.5,
-  blur = 0,
-  ridge = 0,
-  island = 0,
-  dilate = 0,
-  connected = false
+  totalHexagons = 1000,
+  numBatches = 1
 } = {}) {
-  const svg = `
-    <svg width="${width}" height="${width}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <radialGradient id="islandGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="white" />
-          <stop offset="100%" stop-color="black" />
-        </radialGradient>
-      </defs>
-      <filter id="noise" x="0" y="0" width="100%" height="100%">
-        <feTurbulence 
-          type="${type}" 
-          baseFrequency="${baseFrequency}" 
-          numOctaves="${numOctaves}" 
-          seed="${seed}" 
-          result="raw"
-        />
-        <feGaussianBlur in="raw" stdDeviation="${blur}" result="blurred" />
-        
-        <feComponentTransfer in="blurred" result="ridged">
-          <feFuncR type="table" tableValues="0 1 0" />
-        </feComponentTransfer>
-        
-        <feComposite in="blurred" in2="ridged" operator="arithmetic" k2="${1 - ridge}" k3="${ridge}" result="combined" />
-        
-        <feMorphology in="combined" operator="dilate" radius="${dilate}" result="dilated" />
-        
-        <feComposite in="dilated" in2="SourceGraphic" operator="arithmetic" k1="${island}" k2="${1 - island}" />
-      </filter>
-      <rect width="100%" height="100%" fill="url(#islandGrad)" filter="url(#noise)" />
-    </svg>
-  `;
-
-  const blob = new Blob([svg], { type: 'image/svg+xml' });
-  const url = URL.createObjectURL(blob);
-  
-  try {
-    const img = new Image();
-    img.src = url;
-    
-    // Wait for the image to load and decode
-    await img.decode();
-
-    const canvas = new OffscreenCanvas(width, width);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-
-    const imageData = ctx.getImageData(0, 0, width, width);
-    const data = imageData.data;
-    let result = new Uint8Array(width * width);
-
-    for (let i = 0; i < width * width; i++) {
-      // feTurbulence output is in RGB channels. We use the red channel (index i*4).
-      const val = data[i * 4] / 255;
-      result[i] = val > threshold ? 1 : 0;
-    }
-
-    if (connected) {
-      result = ensureConnectivity(result, width);
-    }
-
-    return result;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-/**
- * Ensures that only the largest connected component of the map is kept.
- * 
- * @param {Uint8Array} data - The map data (1s and 0s).
- * @param {number} width - The width of the map.
- * @returns {Uint8Array} A new Uint8Array with only the largest connected component.
- */
-function ensureConnectivity(data, width) {
   const size = width * width;
-  const visited = new Uint8Array(size);
-  let largestComponent = [];
+  const result = new Uint8Array(size);
+  
+  if (totalHexagons <= 0) return result;
+  if (totalHexagons > size) totalHexagons = size;
 
-  for (let i = 0; i < size; i++) {
-    if (data[i] === 1 && !visited[i]) {
-      const component = [];
-      const queue = [i];
-      visited[i] = 1;
+  const hexes = new Set();
+  const hexList = [];
+  
+  const axialNeighbors = [
+    { dq: 1, dr: 0 },
+    { dq: -1, dr: 0 },
+    { dq: 0, dr: 1 },
+    { dq: 0, dr: -1 },
+    { dq: 1, dr: -1 },
+    { dq: -1, dr: 1 }
+  ];
 
-      let head = 0;
-      while (head < queue.length) {
-        const curr = queue[head++];
-        component.push(curr);
+  const cryptoArray = new Uint32Array(1);
 
-        const { q, r } = decodeRowMajor(curr, width);
-        // Neighbors in axial coordinates for pointy-top hex grid
-        const neighbors = [
-          { q: q + 1, r: r },
-          { q: q - 1, r: r },
-          { q: q, r: r + 1 },
-          { q: q, r: r - 1 },
-          { q: q + 1, r: r - 1 },
-          { q: q - 1, r: r + 1 }
-        ];
+  for (let b = 0; b < numBatches; b++) {
+    if (hexes.size >= totalHexagons) break;
 
-        for (const n of neighbors) {
-          const row = n.r;
-          const col = n.q + (row - (row & 1)) / 2;
-          if (row >= 0 && row < width && col >= 0 && col < width) {
-            const ni = row * width + col;
-            if (data[ni] === 1 && !visited[ni]) {
-              visited[ni] = 1;
-              queue.push(ni);
-            }
-          }
+    // Start in a random place for each batch
+    window.crypto.getRandomValues(cryptoArray);
+    let row = cryptoArray[0] % width;
+    window.crypto.getRandomValues(cryptoArray);
+    let col = cryptoArray[0] % width;
+    
+    // Convert to axial for easy neighbor calculation
+    let q = col - (row - (row & 1)) / 2;
+    let r = row;
+
+    let currentIdx = encodeRowMajor(q, r, width);
+    if (result[currentIdx] === 0) {
+      result[currentIdx] = 1;
+      hexes.add(currentIdx);
+      hexList.push(currentIdx);
+    }
+
+    const remainingToAssign = totalHexagons - hexes.size;
+    const remainingBatches = numBatches - b;
+    const targetHexagonsForThisBatch = Math.ceil(remainingToAssign / remainingBatches);
+    let hexagonsAddedInThisBatch = 0;
+
+    while (hexagonsAddedInThisBatch < targetHexagonsForThisBatch && hexes.size < totalHexagons) {
+      window.crypto.getRandomValues(cryptoArray);
+      const dir = axialNeighbors[cryptoArray[0] % 6];
+      
+      const nextQ = q + dir.dq;
+      const nextR = r + dir.dr;
+      
+      // Convert back to offset to check boundaries
+      const nextRow = nextR;
+      const nextCol = nextQ + (nextR - (nextR & 1)) / 2;
+
+      if (nextRow >= 0 && nextRow < width && nextCol >= 0 && nextCol < width) {
+        q = nextQ;
+        r = nextR;
+        const index = nextRow * width + nextCol;
+        if (result[index] === 0) {
+          result[index] = 1;
+          hexes.add(index);
+          hexList.push(index);
+          hexagonsAddedInThisBatch++;
+        }
+      } else {
+        // If we hit the border, we don't move, but we will pick a new direction in the next iteration.
+        // Alternatively, we could jump back to a random hex in the set to avoid getting stuck.
+        window.crypto.getRandomValues(cryptoArray);
+        if ((cryptoArray[0] % 100) < 5) { // 5% chance to jump back to a random hex to avoid being stuck at borders
+           window.crypto.getRandomValues(cryptoArray);
+           const randomHexIdx = hexList[cryptoArray[0] % hexList.length];
+           const coords = decodeRowMajor(randomHexIdx, width);
+           q = coords.q;
+           r = coords.r;
         }
       }
-
-      if (component.length > largestComponent.length) {
-        largestComponent = component;
-      }
     }
   }
 
-  const result = new Uint8Array(size);
-  for (let i = 0; i < largestComponent.length; i++) {
-    result[largestComponent[i]] = 1;
-  }
   return result;
 }

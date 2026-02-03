@@ -36,31 +36,15 @@ const bInput = document.getElementById("brightness");
 /** @type {HTMLInputElement} */
 const sInput = document.getElementById("saturation");
 /** @type {HTMLInputElement} */
-const freqInput = document.getElementById("baseFrequency");
+const totalHexagonsInput = document.getElementById("totalHexagons");
 /** @type {HTMLInputElement} */
-const octavesInput = document.getElementById("numOctaves");
-/** @type {HTMLInputElement} */
-const seedInput = document.getElementById("seed");
-/** @type {HTMLSelectElement} */
-const typeInput = document.getElementById("type");
-/** @type {HTMLInputElement} */
-const blurInput = document.getElementById("blur");
-/** @type {HTMLInputElement} */
-const ridgeInput = document.getElementById("ridge");
-/** @type {HTMLInputElement} */
-const islandInput = document.getElementById("island");
-/** @type {HTMLInputElement} */
-const thresholdInput = document.getElementById("threshold");
-/** @type {HTMLInputElement} */
-const dilateInput = document.getElementById("dilate");
-/** @type {HTMLInputElement} */
-const connectedInput = document.getElementById("connected");
+const numBatchesInput = document.getElementById("numBatches");
 
 const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
 bInput.max = maxB;
 sInput.max = maxS;
 
-seedInput.value = Math.floor(Math.random() * 1000);
+totalHexagonsInput.max = selectedMapWidth ** 2;
 
 const canvas = document.getElementById("main");
 /** @type {WebGL2RenderingContext} */
@@ -109,28 +93,13 @@ gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
 const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
 async function updateMap(isInitial = false) {
-  document.getElementById("val-baseFrequency").textContent = freqInput.value;
-  document.getElementById("val-numOctaves").textContent = octavesInput.value;
-  document.getElementById("val-seed").textContent = seedInput.value;
-  document.getElementById("val-threshold").textContent = thresholdInput.value;
-  document.getElementById("val-type").textContent = typeInput.value;
-  document.getElementById("val-blur").textContent = blurInput.value;
-  document.getElementById("val-ridge").textContent = ridgeInput.value;
-  document.getElementById("val-island").textContent = islandInput.value;
-  document.getElementById("val-dilate").textContent = dilateInput.value;
+  document.getElementById("val-totalHexagons").textContent = totalHexagonsInput.value;
+  document.getElementById("val-numBatches").textContent = numBatchesInput.value;
 
   mapState.reset();
   const mapData = await generateMap(selectedMapWidth, {
-    baseFrequency: parseFloat(freqInput.value),
-    numOctaves: parseInt(octavesInput.value),
-    seed: parseInt(seedInput.value),
-    threshold: parseFloat(thresholdInput.value),
-    type: typeInput.value,
-    blur: parseFloat(blurInput.value),
-    ridge: parseFloat(ridgeInput.value),
-    island: parseFloat(islandInput.value),
-    dilate: parseFloat(dilateInput.value),
-    connected: connectedInput.checked
+    totalHexagons: parseInt(totalHexagonsInput.value),
+    numBatches: parseInt(numBatchesInput.value)
   });
 
   for (let i = 0; i < selectedMapWidth ** 2; i++) {
@@ -304,16 +273,8 @@ function initEventHandlers() {
   bInput.addEventListener("input", onInputChange);
   sInput.addEventListener("input", onInputChange);
   onInputChange();
-  freqInput.addEventListener("input", () => updateMap());
-  octavesInput.addEventListener("input", () => updateMap());
-  seedInput.addEventListener("input", () => updateMap());
-  typeInput.addEventListener("input", () => updateMap());
-  blurInput.addEventListener("input", () => updateMap());
-  ridgeInput.addEventListener("input", () => updateMap());
-  islandInput.addEventListener("input", () => updateMap());
-  thresholdInput.addEventListener("input", () => updateMap());
-  dilateInput.addEventListener("input", () => updateMap());
-  connectedInput.addEventListener("change", () => updateMap());
+  totalHexagonsInput.addEventListener("input", () => updateMap());
+  numBatchesInput.addEventListener("input", () => updateMap());
 }
 
 // for (let i = 0; i < 1000; i++) {
