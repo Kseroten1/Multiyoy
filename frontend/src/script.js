@@ -5,6 +5,7 @@ import {createShader} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
+import {decodeRowMajor, encodeRowMajor} from "./utils/rowMajor.js";
 const state = {
   renderRequestId: null,
 };
@@ -25,7 +26,8 @@ const mapWidth = {
   LIFETIME: 2048
 };
 
-export const selectedMapWidth = mapWidth.EXTRA;
+export const selectedMapWidth = mapWidth.LARGE;
+const totalHexCount = selectedMapWidth ** 2;
 
 /** @type {HTMLInputElement} */
 const bInput = document.getElementById("brightness");
@@ -89,8 +91,35 @@ const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 // }
 // to daje romb
 
-for (let i = 0; i < selectedMapWidth ** 2; i ++) {
-  mapState.setHexStateIndex(i, 1);
+for (let i = 0; i < totalHexCount; i ++) {
+  mapState.setHexStateIndex(i, 0);
+}
+
+const directions = [
+  {dq: 1, dr: 0}, {dq: 1, dr: -1}, {dq: 0, dr: -1},
+  {dq: -1, dr: 0}, {dq: -1, dr: 1}, {dq: 0, dr: 1}
+];
+
+const selectedLandPercentage = 0.5;
+let landHexCount = 1;
+let currentIndex = Math.floor(Math.random() * totalHexCount);
+mapState.setHexStateIndex(currentIndex, 1);
+while (landHexCount < Math.floor(selectedLandPercentage * totalHexCount)) {
+  let direction = Math.floor(Math.random() * 6);
+  let hexCoord = decodeRowMajor(currentIndex, selectedMapWidth);
+  let nextQ = hexCoord.q + directions[direction].dq;
+  let nextR = hexCoord.r + directions[direction].dr;
+  const nextCol = nextQ + Math.floor(nextR / 2);
+  const nextRow = nextR;
+  if (nextRow >= 0 && nextRow < selectedMapWidth && nextCol >= 0 && nextCol < selectedMapWidth) {
+    let nextIndex = encodeRowMajor(nextQ, nextR, selectedMapWidth);
+    if (mapState.getHexState(nextIndex) === 0) {
+      mapState.setHexStateIndex(nextIndex, 1);
+      landHexCount++;
+      console.log(landHexCount);
+    }
+    currentIndex = nextIndex;
+  }
 }
 //to daje kwadrat 
 
@@ -237,6 +266,7 @@ function initEventHandlers() {
   
   bInput.addEventListener("input", onInputChange);
   sInput.addEventListener("input", onInputChange);
+  
 }
 
 // for (let i = 0; i < 1000; i++) {
