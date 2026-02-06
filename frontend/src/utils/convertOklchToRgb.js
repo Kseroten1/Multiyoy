@@ -8,7 +8,7 @@
  * @param H {number}
  * @returns {[number, number, number]}
  */
-function convertOklchToRgb(L, C, H) {
+export function convertOklchToRgb(L, C, H) {
   const labL = (H * Math.PI) / 180;
   const a = Math.cos(labL) * C;
   const b = Math.sin(labL) * C;

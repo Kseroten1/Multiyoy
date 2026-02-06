@@ -46,7 +46,7 @@ export function hexRound(q, r) {
  */
 export function makeMask(edgesEnabled) {
   let mask = 0;
-  for (let index = 0; index < 6; index++) {
+  for (let index = 0; index < 8; index++) {
     if (edgesEnabled[index]) {
       mask |= (1 << index);
     }

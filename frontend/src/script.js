@@ -6,6 +6,9 @@ import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
 import {decodeRowMajor, encodeRowMajor} from "./utils/rowMajor.js";
+import {makeHexColorMask, makeMask} from "./utils/math.js";
+import {calculateHexEdgeMask, directions} from "./utils/hexLogic.js";
+import {calculateHexNeighbour} from "./utils/calculateHexNeighbours.test.js";
 const state = {
   renderRequestId: null,
 };
@@ -26,7 +29,7 @@ const mapWidth = {
   LIFETIME: 2048
 };
 
-export const selectedMapWidth = mapWidth.LARGE;
+export const selectedMapWidth = mapWidth.LIFETIME;
 const totalHexCount = selectedMapWidth ** 2;
 
 /** @type {HTMLInputElement} */
@@ -92,35 +95,55 @@ const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 // to daje romb
 
 for (let i = 0; i < totalHexCount; i ++) {
-  mapState.setHexStateIndex(i, 0);
+  mapState.setHexStateIndex(i, 1);
+  mapState.setHexOwner(i, makeHexColorMask(2, 2, false));
+  mapState.calculatedEdgeMasks.set(i, [0,0,0,0,0,0])
 }
 
-const directions = [
-  {dq: 1, dr: 0}, {dq: 1, dr: -1}, {dq: 0, dr: -1},
-  {dq: -1, dr: 0}, {dq: -1, dr: 1}, {dq: 0, dr: 1}
-];
 
-const selectedLandPercentage = 0.5;
+
+const selectedLandPercentage = 1;
 let landHexCount = 1;
 let currentIndex = Math.floor(Math.random() * totalHexCount);
 mapState.setHexStateIndex(currentIndex, 1);
-while (landHexCount < Math.floor(selectedLandPercentage * totalHexCount)) {
-  let direction = Math.floor(Math.random() * 6);
-  let hexCoord = decodeRowMajor(currentIndex, selectedMapWidth);
-  let nextQ = hexCoord.q + directions[direction].dq;
-  let nextR = hexCoord.r + directions[direction].dr;
-  const nextCol = nextQ + Math.floor(nextR / 2);
-  const nextRow = nextR;
-  if (nextRow >= 0 && nextRow < selectedMapWidth && nextCol >= 0 && nextCol < selectedMapWidth) {
-    let nextIndex = encodeRowMajor(nextQ, nextR, selectedMapWidth);
-    if (mapState.getHexState(nextIndex) === 0) {
-      mapState.setHexStateIndex(nextIndex, 1);
-      landHexCount++;
-      console.log(landHexCount);
-    }
-    currentIndex = nextIndex;
-  }
-}
+mapState.setHexOwner(currentIndex, makeHexColorMask(2, 2, false))
+// while (landHexCount < Math.floor(selectedLandPercentage * totalHexCount)) {
+//   let direction = Math.floor(Math.random() * 6);
+//   let hexCoord = decodeRowMajor(currentIndex, selectedMapWidth);
+//   let nextQ = hexCoord.q + directions[direction].dq;
+//   let nextR = hexCoord.r + directions[direction].dr;
+//   const nextCol = nextQ + Math.floor(nextR / 2);
+//   const nextRow = nextR;
+//   if (nextRow >= 0 && nextRow < selectedMapWidth && nextCol >= 0 && nextCol < selectedMapWidth) {
+//     let nextIndex = encodeRowMajor(nextQ, nextR, selectedMapWidth);
+//     if (mapState.getHexState(nextIndex) === 0) {
+//       mapState.setHexStateIndex(nextIndex, 1);
+//       mapState.setHexOwner(nextIndex, makeHexColorMask(2, 2, false))
+//       if (Math.random() > 0.7) {
+//         mapState.setHexStateIndex(nextIndex, 2);
+//         mapState.setHexOwner(nextIndex, makeHexColorMask(6, 8, false))
+//       }
+//       landHexCount++;
+//     }
+//     currentIndex = nextIndex;
+//   }
+//
+// }
+
+
+mapState.setHexStateIndex(Math.random() * totalHexCount , 2);
+
+// for (let i = 0; i < totalHexCount; i++) {
+//   if (mapState.getHexState(i) === 0) {continue;}
+//   let neighboursIndexes = calculateHexNeighbour(i);
+//   let neighboursOwners = [];
+//   for (let j = 0; j < 6; j++) {
+//     neighboursOwners[j] = mapState.getHexOwner(neighboursIndexes[j]);
+//   }
+//   const mask = calculateHexEdgeMask(mapState.getHexOwner(i), neighboursOwners);
+//   mapState.calculatedEdgeMasks.set(i, mask);
+// }
+
 //to daje kwadrat 
 
 const centers = mapState.arrayForHexRenderer;

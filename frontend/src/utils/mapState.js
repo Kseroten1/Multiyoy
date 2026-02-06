@@ -1,6 +1,5 @@
 import {ExtendedDataView} from "./ExtendedDataView.js";
-import {axialToCenter, makeHexColorMask, makeMask} from "./math.js";
-import {EDGE_MASKS} from "./config.js";
+import {axialToCenter, makeMask} from "./math.js";
 import {selectedMapWidth} from "../script.js";
 import {decodeRowMajor, encodeRowMajor} from "./rowMajor.js";
 
@@ -79,7 +78,7 @@ export class MapState extends Uint8Array {
 
     this.playerCount = playerCount;
     this.hexCount = hexCount;
-
+    this.hexOwners = new Array(hexCount);
   }
 
   get hexCount() {
@@ -141,16 +140,10 @@ export class MapState extends Uint8Array {
   
   setHexStateIndex(index, value) {
     this.hexStates[index] = value;
-
-    const fillMask = makeHexColorMask(1, 1, false); //dodane
-    this.calculatedFillMasks.set(index, fillMask); //dodane
-
-    const edgeMask = makeMask(EDGE_MASKS[0]); //dodane
-    this.calculatedEdgeMasks.set(index, edgeMask); //dodane
   }
 
   get hexOwners() {
-    return new DataView(this.buffer, this.dimensions.hexOwnerOffset, this.dimensions.hexOwnerInBytesPerElement * this.hexCount);
+    return new Uint8Array(this.buffer, this.dimensions.hexOwnerOffset, this.dimensions.hexOwnerInBytesPerElement * this.hexCount);
   }
 
   set hexOwners(value) {
@@ -163,6 +156,7 @@ export class MapState extends Uint8Array {
 
   setHexOwner(index, value) {
     this.hexOwners[index] = value;
+    this.calculatedFillMasks.set(index, value); //dodane
   }
 
   get hexProvinceIds() {
@@ -204,24 +198,33 @@ export class MapState extends Uint8Array {
   setProvinceFinanceState(index, value) {
     this.provinceFinanceStates[index] = value;
   }
-  
+
   get arrayForHexRenderer() {
-    // odczytuje ze stanu index => qr qr => xehCenter, zwroc
-    const centers = [];
+    const centers = new Float32Array(this.hexCount * 2);
     for (let i = 0; i < this.hexCount; i++) {
-      if (this.getHexState(i) === 0) continue;
       const decoded = decodeRowMajor(i, selectedMapWidth);
-      centers.push(...axialToCenter(decoded.q , decoded.r));
+      const [x, y] = axialToCenter(decoded.q, decoded.r);
+      centers[i * 2] = x;
+      centers[i * 2 + 1] = y;
     }
-    return new Float32Array(centers);
+    return centers;
   }
-  
-  get fillMasksArray() {  //dodane
-    return new Float32Array(this.calculatedFillMasks.values());  //dodane
-  }  //dodane
-  
-  get edgeMasksArray() {  //dodane
-    return new Float32Array(this.calculatedEdgeMasks.values());  //dodane
-  }  //dodane
+
+  get fillMasksArray() {
+    const masks = new Float32Array(this.hexCount);
+    for (let i = 0; i < this.hexCount; i++) {
+      // If state is 0, owner 0 makes it invisible in shader
+      masks[i] = this.getHexState(i) === 0 ? 0 : this.getHexOwner(i);
+    }
+    return masks;
+  }
+
+  get edgeMasksArray() {
+    const masks = new Float32Array(this.hexCount);
+    for (let i = 0; i < this.hexCount; i++) {
+      masks[i] = this.calculatedEdgeMasks.get(i) || 0;
+    }
+    return masks;
+  }
   
 }
