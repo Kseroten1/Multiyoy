@@ -4,8 +4,18 @@ export function encodeRowMajor(q, r, width) {
   return row * width + col;
 }
 
-export function decodeRowMajor(index, width) {
+export function decodeRowMajorR(index, width) {
+  return Math.floor(index / width);
+}
+
+export function decodeRowMajorQ(index, width) {
   const r = Math.floor(index / width);
+  const col = index % width;
+  return col - Math.floor(r / 2);
+}
+
+export function decodeRowMajor(index, width) {
+  const r = decodeRowMajorR(index, width);
   const col = index % width;
   const q = col - Math.floor(r / 2);
   return { q, r };

@@ -97,7 +97,7 @@ const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 for (let i = 0; i < totalHexCount; i ++) {
   mapState.setHexStateIndex(i, 1);
   mapState.setHexOwner(i, makeHexColorMask(2, 2, false));
-  mapState.calculatedEdgeMasks.set(i, [0,0,0,0,0,0])
+  mapState.calculatedEdgeMasks[i] = 0b111111;
 }
 
 
