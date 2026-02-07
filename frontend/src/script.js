@@ -67,8 +67,8 @@ gl.linkProgram(program);
 const locations = {
   mvp: gl.getUniformLocation(program, "u_mvp"),
   borderWidth: gl.getUniformLocation(program, "u_borderWidth"),
+  mapWidth: gl.getUniformLocation(program, "u_mapWidth"),
   
-  center: gl.getAttribLocation(program, "a_center"),
   edgeMask: gl.getAttribLocation(program, "a_edgeMask"),
   fillColorMask: gl.getAttribLocation(program, "a_fillColorMask"),
 
@@ -84,6 +84,7 @@ gl.bindVertexArray(vao);
 gl.uniform3fv(locations.fillColors, new Float32Array(fillRgb));
 gl.uniform3fv(locations.edgeColors, new Float32Array(edgeRgb));
 gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
+gl.uniform1i(locations.mapWidth, selectedMapWidth);
 
 const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
@@ -146,15 +147,6 @@ mapState.setHexStateIndex(Math.random() * totalHexCount , 2);
 
 //to daje kwadrat 
 
-const centers = mapState.arrayForHexRenderer;
-
-const bufferCenters = initBuffer(
-  locations.center,
-  ///** @type {ArrayLike<number>} */ hexagonPrecalculatedCenters,
-  centers,
-  2,
-);
-  
 const bufferFill = initBuffer(
   locations.fillColorMask,
   ///** @type {ArrayLike<number>} */ precalculatedFillMask,
@@ -206,7 +198,7 @@ function draw() {
   gl.bindVertexArray(vao);
   const mvp = projectionMatrix.multiply(viewMatrix);
   gl.uniformMatrix4fv(locations.mvp, false, mvp.toFloat32Array());
-  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, centers.length/2);
+  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, totalHexCount);
 }
 
 function scheduleRender() {

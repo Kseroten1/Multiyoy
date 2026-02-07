@@ -219,42 +219,6 @@ export class MapState extends Uint8Array {
     this.provinceFinanceStates[index] = value;
   }
 
-  #sqrt = Math.sqrt(3);
-  #arrayForHexRenderer;
-  get arrayForHexRenderer() {
-    if (this.#arrayForHexRenderer) return this.#arrayForHexRenderer;
-    const hexCount = this.hexCount;
-    const width = selectedMapWidth;
-    const sqrt = this.#sqrt;
-    const halfSqrt = 0.5 * sqrt;
-    
-    const centers = new Float32Array(hexCount * 2);
-
-    let i2 = 0;
-    let y = 0;
-    for (let r = 0; r < width; r++) {
-      let x = (r & 1) * halfSqrt;
-      for (let col = 0; col < width; col++) {
-        centers[i2++] = x;
-        centers[i2++] = y;
-        x += sqrt;
-      }
-      y += 1.5;
-    }
-
-    // let i = rows * width;
-    // if (i < hexCount) {
-    //   let x = (rows & 1) * halfSqrt;
-    //   for (; i < hexCount; i++) {
-    //     centers[i2++] = x;
-    //     centers[i2++] = y;
-    //     x += sqrt;
-    //   }
-    // }
-    this.#arrayForHexRenderer = centers;
-    return centers;
-  }
-
   get fillMasksArray() {
     const hexCount = this.hexCount;
     const masks = new Float32Array(hexCount);
