@@ -1,8 +1,6 @@
 import {ExtendedDataView} from "./ExtendedDataView.js";
-import {axialToCenter, makeHexColorMask, makeMask} from "./math.js";
-import {EDGE_MASKS} from "./config.js";
 import {selectedMapWidth} from "../script.js";
-import {decodeRowMajor, encodeRowMajor} from "./rowMajor.js";
+import {encodeRowMajor} from "./rowMajor.js";
 
 function calculateMapStateDimensions(playerCount, hexCount) {
   const provinceCount = hexCount / 4;
@@ -67,9 +65,8 @@ export class MapState extends Uint8Array {
   dataView = new ExtendedDataView(this.buffer)
 
   dimensions
-  
-  calculatedFillMasks = new Map(); //dodane
-  calculatedEdgeMasks = new Map(); //dodane
+
+  calculatedEdgeMasks; //dodane
 
   constructor(playerCount, hexCount) {
     const dimensions = calculateMapStateDimensions(playerCount, hexCount);
@@ -79,51 +76,67 @@ export class MapState extends Uint8Array {
 
     this.playerCount = playerCount;
     this.hexCount = hexCount;
-
+    this.calculatedEdgeMasks = new Array(hexCount);
   }
 
+  #hexCount;
   get hexCount() {
-    return this.dataView.getNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes);
+    this.#hexCount ??= this.dataView.getNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes);
+    return this.#hexCount;
   }
 
   set hexCount(number) {
+    this.#hexCount = number;
     this.dataView.setNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes, number);
   }
 
+  #playerCount;
   get playerCount() {
-    return this.dataView.getNumber(this.dimensions.playerCountOffset, this.dimensions.playerCountInBytes);
+    this.#playerCount ??= this.dataView.getNumber(this.dimensions.playerCountOffset, this.dimensions.playerCountInBytes);
+    return this.#playerCount;
   }
 
   set playerCount(value) {
+    this.#playerCount = value;
     this.dataView.setNumber(this.dimensions.playerCountOffset, this.dimensions.playerCountInBytes, value);
   }
 
+  #currentPlayer;
   get currentPlayer() {
-    return this.dataView.getNumber(this.dimensions.currentPlayerOffset, this.dimensions.currentPlayerInBytes);
+    this.#currentPlayer ??= this.dataView.getNumber(this.dimensions.currentPlayerOffset, this.dimensions.currentPlayerInBytes);
+    return this.#currentPlayer;
   }
 
   set currentPlayer(value) {
+    this.#currentPlayer = value;
     this.dataView.setNumber(this.dimensions.currentPlayerOffset, this.dimensions.currentPlayerInBytes, value);
   }
 
+  #currentRound;
   get currentRound() {
-    return this.dataView.getNumber(this.dimensions.currentRoundOffset, this.dimensions.currentRoundInBytes);
+    this.#currentRound ??= this.dataView.getNumber(this.dimensions.currentRoundOffset, this.dimensions.currentRoundInBytes);
+    return this.#currentRound;
   }
 
   set currentRound(value) {
+    this.#currentRound = value;
     this.dataView.setNumber(this.dimensions.currentRoundOffset, this.dimensions.currentRoundInBytes, value);
   }
 
+  #provinceCount;
   get provinceCount() {
-    return this.dataView.getNumber(this.dimensions.provinceCountOffset, this.dimensions.provinceCountInBytes);
+    this.#provinceCount ??= this.dataView.getNumber(this.dimensions.provinceCountOffset, this.dimensions.provinceCountInBytes);
+    return this.#provinceCount;
   }
 
   set provinceCount(value) {
+    this.#provinceCount = value;
     this.dataView.setNumber(this.dimensions.provinceCountOffset, this.dimensions.provinceCountInBytes, value);
   }
 
+  #hexStates;
   get hexStates() {
-    return new Uint8Array(this.buffer, this.dimensions.hexStateOffset, this.dimensions.hexStateInBytesPerElement * this.hexCount);
+    return this.#hexStates ??= new Uint8Array(this.buffer, this.dimensions.hexStateOffset, this.dimensions.hexStateInBytesPerElement * this.hexCount);
   }
 
   set hexStates(value) {
@@ -138,19 +151,14 @@ export class MapState extends Uint8Array {
     let index = encodeRowMajor(q , r, selectedMapWidth);
     this.setHexStateIndex(index, value);
   }
-  
+
   setHexStateIndex(index, value) {
     this.hexStates[index] = value;
-
-    const fillMask = makeHexColorMask(1, 1, false); //dodane
-    this.calculatedFillMasks.set(index, fillMask); //dodane
-
-    const edgeMask = makeMask(EDGE_MASKS[0]); //dodane
-    this.calculatedEdgeMasks.set(index, edgeMask); //dodane
   }
 
+  #hexOwners;
   get hexOwners() {
-    return new DataView(this.buffer, this.dimensions.hexOwnerOffset, this.dimensions.hexOwnerInBytesPerElement * this.hexCount);
+    return this.#hexOwners ??= new Uint8Array(this.buffer, this.dimensions.hexOwnerOffset, this.dimensions.hexOwnerInBytesPerElement * this.hexCount);
   }
 
   set hexOwners(value) {
@@ -165,8 +173,9 @@ export class MapState extends Uint8Array {
     this.hexOwners[index] = value;
   }
 
+  #hexProvinceIds;
   get hexProvinceIds() {
-    return new DataView(this.buffer, this.dimensions.hexProvinceIdInBytesPerElement * this.hexCount);
+    return this.#hexProvinceIds ??= new DataView(this.buffer, this.dimensions.hexProvinceIdOffset, this.dimensions.hexProvinceIdInBytesPerElement * this.hexCount);
   }
 
   set hexProvinceIds(value) {
@@ -181,16 +190,20 @@ export class MapState extends Uint8Array {
     this.hexProvinceIds[index] = value;
   }
 
+  #maxProvinceFinance;
   get maxProvinceFinance() {
-    return this.dataView.getNumber(this.dimensions.maxProvinceFinanceOffset, this.dimensions.maxProvinceFinanceInBytes);
+    this.#maxProvinceFinance ??= this.dataView.getNumber(this.dimensions.maxProvinceFinanceOffset, this.dimensions.maxProvinceFinanceInBytes);
+    return this.#maxProvinceFinance;
   }
 
   set maxProvinceFinance(value) {
+    this.#maxProvinceFinance = value;
     this.dataView.setNumber(this.dimensions.maxProvinceFinanceOffset, this.dimensions.maxProvinceFinanceInBytes, value);
   }
 
+  #provinceFinanceStates;
   get provinceFinanceStates() {
-    return new DataView(this.buffer, this.dimensions.provinceFinanceStateInBytesPerElement * this.provinceCount)
+    return this.#provinceFinanceStates ??= new DataView(this.buffer, this.dimensions.provinceFinanceStateOffset, this.dimensions.provinceFinanceStateInBytesPerElement * this.provinceCount);
   }
 
   set provinceFinanceStates(value) {
@@ -204,24 +217,27 @@ export class MapState extends Uint8Array {
   setProvinceFinanceState(index, value) {
     this.provinceFinanceStates[index] = value;
   }
-  
-  get arrayForHexRenderer() {
-    // odczytuje ze stanu index => qr qr => xehCenter, zwroc
-    const centers = [];
-    for (let i = 0; i < this.hexCount; i++) {
-      if (this.getHexState(i) === 0) continue;
-      const decoded = decodeRowMajor(i, selectedMapWidth);
-      centers.push(...axialToCenter(decoded.q , decoded.r));
+
+  get fillMasksArray() {
+    const hexCount = this.hexCount;
+    const masks = new Float32Array(hexCount);
+    const hexStates = this.hexStates;
+    const hexOwners = this.hexOwners;
+    for (let i = 0; i < hexCount; i++) {
+      // If state is 0, owner 0 makes it invisible in shader
+      masks[i] = (hexStates[i] !== 0) * hexOwners[i];
     }
-    return new Float32Array(centers);
+    return masks;
   }
-  
-  get fillMasksArray() {  //dodane
-    return new Float32Array(this.calculatedFillMasks.values());  //dodane
-  }  //dodane
-  
-  get edgeMasksArray() {  //dodane
-    return new Float32Array(this.calculatedEdgeMasks.values());  //dodane
-  }  //dodane
-  
+
+  get edgeMasksArray() {
+    const hexCount = this.hexCount;
+    const masks = new Float32Array(hexCount);
+    const calculatedEdgeMasks = this.calculatedEdgeMasks;
+    for (let i = 0; i < hexCount; i++) {
+      masks[i] = calculatedEdgeMasks[i] || 0;
+    }
+    return masks;
+  }
+
 }

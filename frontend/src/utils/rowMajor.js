@@ -1,21 +1,22 @@
-export function encodeRowMajor(q, r, mapWidth) {
-  const col = q + (r - (r & 1)) / 2;
+export function encodeRowMajor(q, r, width) {
+  const col = q + Math.floor(r / 2);
   const row = r;
-
-  return row * mapWidth + col;
+  return row * width + col;
 }
 
-/**
- * 
- * @param index
- * @param mapWidth
- * @returns {{q: number, r: number}}
- */
-export function decodeRowMajor(index, mapWidth) {
-  const col = index % mapWidth;
-  const row = Math.floor(index / mapWidth);
-  // 2. Convert Offset(col,row) to Axial(q,r)
-  const q = col - (row - (row & 1)) / 2;
-  const r = row;
+export function decodeRowMajorR(index, width) {
+  return Math.floor(index / width);
+}
+
+export function decodeRowMajorQ(index, width) {
+  const r = Math.floor(index / width);
+  const col = index % width;
+  return col - Math.floor(r / 2);
+}
+
+export function decodeRowMajor(index, width) {
+  const r = decodeRowMajorR(index, width);
+  const col = index % width;
+  const q = col - Math.floor(r / 2);
   return { q, r };
 }

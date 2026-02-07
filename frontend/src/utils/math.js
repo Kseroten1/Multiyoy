@@ -1,12 +1,18 @@
+export function axialToCenterX(q, r) {
+  return Math.sqrt(3) * (q + r / 2);
+}
+
+export function axialToCenterY(q, r) {
+  return (3 / 2) * r;
+}
+
 /**
  * @param q
  * @param r
  * @returns {number[x,y]}
  */
 export function axialToCenter(q, r) {
-  const x = Math.sqrt(3) * (q + r / 2);
-  const y = (3 / 2) * r;
-  return [x, y];
+  return [axialToCenterX(q, r), axialToCenterY(q, r)];
 }
 
 export function pixelToAxial(x, y) {
@@ -40,13 +46,13 @@ export function hexRound(q, r) {
 }
 
 /**
- * 
+ *
  * @param edgesEnabled
  * @returns {number}
  */
 export function makeMask(edgesEnabled) {
   let mask = 0;
-  for (let index = 0; index < 6; index++) {
+  for (let index = 0; index < 8; index++) {
     if (edgesEnabled[index]) {
       mask |= (1 << index);
     }
@@ -55,7 +61,7 @@ export function makeMask(edgesEnabled) {
 }
 
 /**
- * 
+ *
  * @param color1 {number}
  * @param color2 {number}
  * @param isVertical {boolean}
