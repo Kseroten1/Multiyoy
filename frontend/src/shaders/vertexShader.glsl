@@ -1,5 +1,5 @@
 #version 300 es
-precision highp float; 
+precision highp float;
 
 const vec2 HEX_OFFSETS[8] = vec2[](
     vec2(0.0, 0.0),   // V0 (center)
@@ -13,8 +13,8 @@ const vec2 HEX_OFFSETS[8] = vec2[](
 );
 
 uniform mat4 u_mvp;
+uniform int u_mapWidth;
 
-in vec2 a_center;
 in float a_edgeMask;
 in float a_fillColorMask;
 
@@ -24,12 +24,21 @@ flat out float v_fillColorMask;
 out vec2 v_local;
 
 void main() {
+    int idx = gl_InstanceID;
+    int r = idx / u_mapWidth;
+    int col = idx % u_mapWidth;
+
+    float sqrt3 = 1.73205081;
+    float x = float(col) * sqrt3 + float(r & 1) * 0.5 * sqrt3;
+    float y = float(r) * 1.5;
+    vec2 center = vec2(x, y);
+
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
     v_vertexID = gl_VertexID;
     v_edgeMask = a_edgeMask;
     v_fillColorMask = a_fillColorMask;
     v_local = localPos;
-    vec2 modelPos = a_center + localPos;
+    vec2 modelPos = center + localPos;
     vec4 clipPos = u_mvp * vec4(modelPos, 0.0, 1.0);
     gl_Position = vec4(clipPos.xy, 0.0, 1.0);
 }

@@ -1,20 +1,39 @@
 import vertexShaderString from './shaders/vertexShader.glsl?raw';
 import fragmentShaderString from './shaders/fragmentShader.glsl?raw';
-import {COLOR_TABLE_EDGE, COLOR_TABLE_FILL, EDGE_MASKS} from './utils/config.js';
-import {generateAxialHexCenters, makeMask, makeHexColorMask} from './utils/math.js';
+import {COLOR_TABLE_EDGE, COLOR_TABLE_FILL} from './utils/config.js';
 import {createShader} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
+import {MapState} from "./utils/mapState.js";
+import {makeHexColorMask} from "./utils/math.js";
 
 const state = {
   renderRequestId: null,
 };
 
-const CONFIG = {
-  hexRadius: 600,
-  hexSize: 1.0,
+export const CONFIG = {
   defaultBorderWidth: 0.1,
+  playerCount: 1500
 };
+
+const mapWidth = {
+  QUICK: 16,
+  SMALL: 32,
+  MEDIUM: 64,
+  LARGE: 128,
+  HUGE: 256,
+  EXTRA: 512,
+  YEAR10: 1024,
+  LIFETIME: 2048
+};
+
+const directions = [
+  {dq: 0, dr: 1}, {dq: 1, dr: 0}, {dq: 1, dr: -1},
+  {dq: 0, dr: -1}, {dq: -1, dr: 0}, {dq: -1, dr: 1}
+];
+
+export const selectedMapWidth = mapWidth.LIFETIME;
+const totalHexCount = selectedMapWidth ** 2;
 
 /** @type {HTMLInputElement} */
 const bInput = document.getElementById("brightness");
@@ -51,8 +70,8 @@ gl.linkProgram(program);
 const locations = {
   mvp: gl.getUniformLocation(program, "u_mvp"),
   borderWidth: gl.getUniformLocation(program, "u_borderWidth"),
-  
-  center: gl.getAttribLocation(program, "a_center"),
+  mapWidth: gl.getUniformLocation(program, "u_mapWidth"),
+
   edgeMask: gl.getAttribLocation(program, "a_edgeMask"),
   fillColorMask: gl.getAttribLocation(program, "a_fillColorMask"),
 
@@ -68,27 +87,28 @@ gl.bindVertexArray(vao);
 gl.uniform3fv(locations.fillColors, new Float32Array(fillRgb));
 gl.uniform3fv(locations.edgeColors, new Float32Array(edgeRgb));
 gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
+gl.uniform1i(locations.mapWidth, selectedMapWidth);
 
-const hexagonPrecalculatedCenters = generateAxialHexCenters(CONFIG.hexRadius, CONFIG.hexSize);
-let instanceCount = hexagonPrecalculatedCenters.length / 2;
-const precalculatedFillMask = Array.from({length: instanceCount}, () => makeHexColorMask(1, 1, false));
-const precalculatedEdgeMasks = Array.from({length: instanceCount}, () => makeMask(EDGE_MASKS[0]));
+const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
-const bufferCenters = initBuffer(
-  locations.center,
-  /** @type {ArrayLike<number>} */ hexagonPrecalculatedCenters,
-  2,
-);
-  
+for (let i = 0; i < totalHexCount; i ++) {
+  mapState.setHexStateIndex(i, 1);
+  mapState.setHexOwner(i, makeHexColorMask(2, 2, false));
+  mapState.calculatedEdgeMasks[i] = 0b111111;
+}
+//to daje kwadrat 
+
 const bufferFill = initBuffer(
   locations.fillColorMask,
-  /** @type {ArrayLike<number>} */ precalculatedFillMask,
+  ///** @type {ArrayLike<number>} */ precalculatedFillMask,
+  mapState.fillMasksArray,
   1,
 );
 
 const bufferEdge = initBuffer(
   locations.edgeMask,
-  /** @type {ArrayLike<number>} */ precalculatedEdgeMasks,
+  ///** @type {ArrayLike<number>} */ precalculatedEdgeMasks,
+  mapState.edgeMasksArray,
   1,
 );
 
@@ -97,7 +117,7 @@ scheduleRender();
 initEventHandlers();
 
 /**
- * 
+ *
  * @param location {GLuint}
  * @param data {ArrayLike<number>}
  * @param size {Number}
@@ -122,14 +142,14 @@ function modifyBuffer(buffer, data) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(data));
 }
-  
+
 function draw() {
   state.renderRequestId = null;
   gl.useProgram(program);
   gl.bindVertexArray(vao);
   const mvp = projectionMatrix.multiply(viewMatrix);
   gl.uniformMatrix4fv(locations.mvp, false, mvp.toFloat32Array());
-  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, instanceCount);
+  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, totalHexCount);
 }
 
 function scheduleRender() {
@@ -150,7 +170,7 @@ function onResize() {
 function initEventHandlers() {
   let dragging = false;
   const lastPosition = { x: 0, y: 0 };
-  
+
   canvas.addEventListener("wheel", (e) => {
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
@@ -162,12 +182,12 @@ function initEventHandlers() {
 
     const x = e.clientX - viewCenterX;
     const y = e.clientY - viewCenterY;
-    
+
     const zoomMatrix = new DOMMatrix()
       .translate(x, y)
       .scale(factor)
       .translate(-x, -y);
-    
+
     viewMatrix.preMultiplySelf(zoomMatrix);
     scheduleRender();
   }, { passive: false });
@@ -203,27 +223,18 @@ function initEventHandlers() {
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointerleave", endDrag);
   window.addEventListener("resize", onResize);
-  
+
   function onInputChange() {
     gl.uniform3fv(locations.fillColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL));
     gl.uniform3fv(locations.edgeColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_EDGE));
     scheduleRender();
   }
-  
+
   bInput.addEventListener("input", onInputChange);
   sInput.addEventListener("input", onInputChange);
+
 }
 
-for (let i = 0; i < 1000; i++) {
-  // await new Promise(r => setTimeout(r, 100));
-  // console.log("Lowering hex count to first 1k");
-  // instanceCount = 1000;
-  // scheduleRender();
-
-  await new Promise(r => setTimeout(r, 10));
-  console.log("Changing hexagon centers to random 50%");
-  const randomCenters = hexagonPrecalculatedCenters.filter(() => Math.random() > 0.5);
-  modifyBuffer(bufferCenters, /** @type {ArrayLike<number>} */ randomCenters);
-  instanceCount = randomCenters.length / 2;
-  scheduleRender();
-}
+// for (let i = 0; i < 1000; i++) {
+//
+// }
