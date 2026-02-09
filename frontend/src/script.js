@@ -17,7 +17,6 @@ export const CONFIG = {
 };
 
 const mapWidth = {
-  QUICK: 16,
   SMALL: 32,
   MEDIUM: 64,
   LARGE: 128,
@@ -93,21 +92,41 @@ const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
 for (let i = 0; i < totalHexCount; i ++) {
   mapState.setHexStateIndex(i, 1);
-  mapState.setHexOwner(i, makeHexColorMask(2, 2, false));
-  mapState.calculatedEdgeMasks[i] = 0b111111;
+  mapState.setHexOwner(i, Math.random() > 0.5 ? makeHexColorMask(2, 2, false) : makeHexColorMask(4, 4, false));
+  mapState.calculatedEdgeMasks[i] = 0b000000;
 }
+
+function generateHexMaskFirst() {
+  for (let i = 0; i < totalHexCount - 1; i++) {
+    const r = Math.floor(i / selectedMapWidth);
+    const isRowOdd = (r & 1) !== 0;
+    const indexDownRight = i + selectedMapWidth + isRowOdd;
+    const indexDownLeft = i + selectedMapWidth + isRowOdd - 1;
+
+    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b000010;
+    mapState.calculatedEdgeMasks[i + 1] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b010000;
+
+    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownRight]);
+    mapState.calculatedEdgeMasks[indexDownRight] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownRight]) * 0b001000;
+
+    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b100000;
+    mapState.calculatedEdgeMasks[indexDownLeft] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b000100;
+  }
+}
+
+generateHexMaskFirst();
 //to daje kwadrat 
 
 const bufferFill = initBuffer(
   locations.fillColorMask,
-  ///** @type {ArrayLike<number>} */ precalculatedFillMask,
+  ///** @type {ArrayLike<>} */ precalculatedFillMask,
   mapState.fillMasksArray,
   1,
 );
 
 const bufferEdge = initBuffer(
   locations.edgeMask,
-  ///** @type {ArrayLike<number>} */ precalculatedEdgeMasks,
+  ///** @type {ArrayLike<>} */ precalculatedEdgeMasks,
   mapState.edgeMasksArray,
   1,
 );
@@ -119,8 +138,8 @@ initEventHandlers();
 /**
  *
  * @param location {GLuint}
- * @param data {ArrayLike<number>}
- * @param size {Number}
+ * @param data {ArrayLike<>}
+ * @param size {}
  * @returns {WebGLBuffer}
  */
 function initBuffer(location, data, size) {
@@ -136,7 +155,7 @@ function initBuffer(location, data, size) {
 /**
  *
  * @param buffer {WebGLBuffer}
- * @param data {ArrayLike<number>}
+ * @param data {ArrayLike<>}
  */
 function modifyBuffer(buffer, data) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
