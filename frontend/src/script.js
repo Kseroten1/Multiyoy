@@ -97,6 +97,7 @@ for (let i = 0; i < totalHexCount; i ++) {
 }
 
 function generateHexMaskFirst() {
+  mapState.calculatedEdgeMasks.fill(0);
   for (let i = 0; i < totalHexCount - 1; i++) {
     const r = Math.floor(i / selectedMapWidth);
     const isRowOdd = (r & 1) !== 0;
@@ -238,7 +239,68 @@ function initEventHandlers() {
     canvas.releasePointerCapture(e.pointerId);
     scheduleRender();
   };
+  
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const viewCenterX = window.innerWidth / 2;
+    const viewCenterY = window.innerHeight / 2;
 
+    // 1. Convert click to center-relative coordinates
+    const screenX = e.clientX - rect.left - viewCenterX;
+    const screenY = e.clientY - rect.top - viewCenterY;
+
+    // 2. Invert the viewMatrix to get World Coordinates
+    // This reverses your pan and zoom
+    const inv = viewMatrix.inverse();
+    const worldPoint = new DOMPoint(screenX, screenY).matrixTransform(inv);
+    const wx = worldPoint.x;
+    const wy = worldPoint.y;
+
+    // 3. Reverse Shader Math: y = r * 1.5  =>  r = y / 1.5
+    // We check the nearest row and its neighbors for precision
+    const rowBase = Math.round(wy / 1.5);
+    const sqrt3 = 1.73205081;
+
+    let bestId = -1;
+    let minDist = Infinity;
+
+    // Check the 3 most likely hexes (current row and rows above/below)
+    // to account for the "pointy" corners where rounding fails
+    for (let r = rowBase - 1; r <= rowBase + 1; r++) {
+      // Reverse Shader Math: x = col * sqrt3 + (r & 1) * 0.5 * sqrt3
+      // col = (x - (r & 1) * 0.5 * sqrt3) / sqrt3
+      const rowOffset = (Math.abs(r) % 2) * 0.5 * sqrt3;
+      const col = Math.round((wx - rowOffset) / sqrt3);
+
+      // Calculate the actual center of this candidate hex using your shader's logic
+      const centerX = col * sqrt3 + rowOffset;
+      const centerY = r * 1.5;
+
+      // Distance from click to this hex center
+      const dist = Math.hypot(wx - centerX, wy - centerY);
+
+      if (dist < minDist) {
+        minDist = dist;
+        // Reconstruct the gl_InstanceID: idx = r * u_mapWidth + col
+        // u_mapWidth must be accessible here (from your uniform or state)
+        if (col >= 0 && col < selectedMapWidth && r >= 0) {
+          bestId = r * selectedMapWidth + col;
+        }
+      }
+    }
+
+    // 4. Output or Use the ID
+    if (bestId !== -1) {
+      console.log("Clicked Hex ID:", bestId);
+      // Math.floor(Math.random() * 13), Math.floor(Math.random() * 13),
+      mapState.setHexOwner(bestId, makeHexColorMask(2, 2, false));
+      generateHexMaskFirst();
+      modifyBuffer(bufferEdge, mapState.edgeMasksArray);
+      modifyBuffer(bufferFill, mapState.fillMasksArray);
+      scheduleRender();
+      // changeHexValue(bestId);
+    }
+  });
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointerleave", endDrag);
   window.addEventListener("resize", onResize);
