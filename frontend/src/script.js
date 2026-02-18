@@ -6,7 +6,6 @@ import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
 import {makeHexColorMask} from "./utils/math.js";
-import {decodeRowMajor, encodeRowMajor} from "./utils/rowMajor.js";
 import {getHexNeighbors} from "./utils/hexLogicHelper.js";
 
 const state = {
@@ -27,11 +26,6 @@ const mapWidth = {
   YEAR10: 1024,
   LIFETIME: 2048
 };
-
-const directions = [
-  {dq: 0, dr: 1}, {dq: 1, dr: 0}, {dq: 1, dr: -1},
-  {dq: 0, dr: -1}, {dq: -1, dr: 0}, {dq: -1, dr: 1}
-];
 
 export const selectedMapWidth = mapWidth.LIFETIME;
 const totalHexCount = selectedMapWidth ** 2;
@@ -140,7 +134,6 @@ function calculateHexMaskIndex(indices) {
 }
 
 generateHexMaskFirst();
-//to daje kwadrat 
 
 const bufferFill = initBuffer(
   locations.fillColorMask,
@@ -216,28 +209,55 @@ function initEventHandlers() {
   const lastPosition = { x: 0, y: 0 };
 
   canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
 
-    const zoomSpeed = 0.001;
-    const factor = Math.exp(-e.deltaY * zoomSpeed);
-    const viewCenterX = window.innerWidth / 2;
-    const viewCenterY = window.innerHeight / 2;
+    if (e.ctrlKey) {
+      const zoomSpeed = 0.01;
+      const factor = Math.exp(-e.deltaY * zoomSpeed);
+      const viewCenterX = window.innerWidth / 2;
+      const viewCenterY = window.innerHeight / 2;
 
-    const x = e.clientX - viewCenterX;
-    const y = e.clientY - viewCenterY;
+      const x = e.clientX - viewCenterX;
+      const y = e.clientY - viewCenterY;
 
-    const zoomMatrix = new DOMMatrix()
-      .translate(x, y)
-      .scale(factor)
-      .translate(-x, -y);
-
-    viewMatrix.preMultiplySelf(zoomMatrix);
+      const zoomMatrix = new DOMMatrix()
+        .translate(x, y)
+        .scale(factor)
+        .translate(-x, -y);
+      
+      viewMatrix.preMultiplySelf(zoomMatrix);
+    } else {
+      viewMatrix.translateSelf(-e.deltaX / viewMatrix.a, -e.deltaY / viewMatrix.d);
+    }
     scheduleRender();
   }, { passive: false });
 
   canvas.addEventListener("pointerdown", (e) => {
     if (dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const viewCenterX = window.innerWidth / 2;
+    const viewCenterY = window.innerHeight / 2;
+
+    const screenX = e.clientX - rect.left - viewCenterX;
+    const screenY = e.clientY - rect.top - viewCenterY;
+    const inv = viewMatrix.inverse();
+    const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
+
+    const sqrt3 = 1.73205081;
+    const row = Math.round(worldY / 1.5);
+    const rowOffset = (Math.abs(row) % 2) * 0.5 * sqrt3;
+    const col = Math.round((worldX - rowOffset) / sqrt3);
+
+    const hexIndex = row * selectedMapWidth + col;
+    mapState.setHexOwner(hexIndex, makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false));
+    modifyBuffer(bufferFill, mapState.fillMasksArray);
+    const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex)];
+    calculateHexMaskIndex(hexToUpdate);
+    modifyBuffer(bufferEdge, mapState.edgeMasksArray);
+    scheduleRender();
+
     dragging = true;
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
@@ -263,33 +283,6 @@ function initEventHandlers() {
     canvas.releasePointerCapture(e.pointerId);
     scheduleRender();
   };
-  
-  canvas.addEventListener("click", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const viewCenterX = window.innerWidth / 2;
-    const viewCenterY = window.innerHeight / 2;
-
-      const screenX = e.clientX - rect.left - viewCenterX;
-      const screenY = e.clientY - rect.top - viewCenterY;
-      const inv = viewMatrix.inverse();
-      const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
-
-      const sqrt3 = 1.73205081;
-      const row = Math.round(worldY / 1.5);
-      const rowOffset = (Math.abs(row) % 2) * 0.5 * sqrt3;
-      const col = Math.round((worldX - rowOffset) / sqrt3);
-
-      const hexIndex = row * selectedMapWidth + col;
-
-      // Math.floor(Math.random() * 13), Math.floor(Math.random() * 13),
-      mapState.setHexOwner(hexIndex, makeHexColorMask(2, 2, false));
-      modifyBuffer(bufferFill, mapState.fillMasksArray);
-      const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex)];
-      calculateHexMaskIndex(hexToUpdate);
-      modifyBuffer(bufferEdge, mapState.edgeMasksArray);
-      scheduleRender();
-      // changeHexValue(bestId);
-  });
   
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointerleave", endDrag);
