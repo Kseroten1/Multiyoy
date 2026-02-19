@@ -6,6 +6,7 @@ import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
 import {makeHexColorMask} from "./utils/math.js";
+import {getHexNeighbors} from "./utils/hexLogicHelper.js";
 
 const state = {
   renderRequestId: null,
@@ -26,12 +27,7 @@ const mapWidth = {
   LIFETIME: 2048
 };
 
-const directions = [
-  {dq: 0, dr: 1}, {dq: 1, dr: 0}, {dq: 1, dr: -1},
-  {dq: 0, dr: -1}, {dq: -1, dr: 0}, {dq: -1, dr: 1}
-];
-
-export const selectedMapWidth = mapWidth.LIFETIME;
+export const selectedMapWidth = mapWidth.EXTRA;
 const totalHexCount = selectedMapWidth ** 2;
 
 /** @type {HTMLInputElement} */
@@ -114,19 +110,40 @@ function generateHexMaskFirst() {
   }
 }
 
+function calculateHexMaskIndex(indices) {
+  const neighborMasks = [
+    0b000010, // East
+    0b010000, // West
+    0b000001, // LowerRight
+    0b100000, // LowerLeft
+    0b000100, // UpperRight
+    0b001000  // UpperLeft
+  ];
+
+  for (const currentIndex of indices) {
+    const neighbors = getHexNeighbors(currentIndex);
+    const currentOwner = mapState.hexOwners[currentIndex];
+    let mask = 0;
+
+    for (const neighborId of neighbors) {
+      const i = neighbors.indexOf(neighborId);
+      if (currentOwner !== mapState.hexOwners[neighborId]) {mask |= neighborMasks[i];}
+    }
+
+    mapState.calculatedEdgeMasks[currentIndex] = mask;
+  }
+}
+
 generateHexMaskFirst();
-//to daje kwadrat 
 
 const bufferFill = initBuffer(
   locations.fillColorMask,
-  ///** @type {ArrayLike<>} */ precalculatedFillMask,
   mapState.fillMasksArray,
   1,
 );
 
 const bufferEdge = initBuffer(
   locations.edgeMask,
-  ///** @type {ArrayLike<>} */ precalculatedEdgeMasks,
   mapState.edgeMasksArray,
   1,
 );
@@ -138,8 +155,8 @@ initEventHandlers();
 /**
  *
  * @param location {GLuint}
- * @param data {ArrayLike<>}
- * @param size {}
+ * @param data {ArrayLike<unknown>}
+ * @param size {number}
  * @returns {WebGLBuffer}
  */
 function initBuffer(location, data, size) {
@@ -155,11 +172,12 @@ function initBuffer(location, data, size) {
 /**
  *
  * @param buffer {WebGLBuffer}
- * @param data {ArrayLike<>}
+ * @param offset {number}
+ * @param data {ArrayLike<unknown> | unknown[]}
  */
-function modifyBuffer(buffer, data) {
+function modifyBuffer(buffer,offset,  data) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(data));
+  gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT , new Float32Array(data));
 }
 
 function draw() {
@@ -191,28 +209,62 @@ function initEventHandlers() {
   const lastPosition = { x: 0, y: 0 };
 
   canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
 
-    const zoomSpeed = 0.001;
-    const factor = Math.exp(-e.deltaY * zoomSpeed);
-    const viewCenterX = window.innerWidth / 2;
-    const viewCenterY = window.innerHeight / 2;
+    if (e.ctrlKey) {
+      const zoomSpeed = 0.01;
+      const factor = Math.exp(-e.deltaY * zoomSpeed);
+      const viewCenterX = window.innerWidth / 2;
+      const viewCenterY = window.innerHeight / 2;
 
-    const x = e.clientX - viewCenterX;
-    const y = e.clientY - viewCenterY;
+      const x = e.clientX - viewCenterX;
+      const y = e.clientY - viewCenterY;
 
-    const zoomMatrix = new DOMMatrix()
-      .translate(x, y)
-      .scale(factor)
-      .translate(-x, -y);
-
-    viewMatrix.preMultiplySelf(zoomMatrix);
+      const zoomMatrix = new DOMMatrix()
+        .translate(x, y)
+        .scale(factor)
+        .translate(-x, -y);
+      
+      viewMatrix.preMultiplySelf(zoomMatrix);
+    } else {
+      viewMatrix.translateSelf(-e.deltaX / viewMatrix.a, -e.deltaY / viewMatrix.d);
+    }
     scheduleRender();
   }, { passive: false });
 
   canvas.addEventListener("pointerdown", (e) => {
     if (dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const viewCenterX = window.innerWidth / 2;
+    const viewCenterY = window.innerHeight / 2;
+
+    const screenX = e.clientX - rect.left - viewCenterX;
+    const screenY = e.clientY - rect.top - viewCenterY;
+    const inv = viewMatrix.inverse();
+    const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
+
+    const sqrt3 = 1.73205081;
+    const row = Math.round(worldY / 1.5);
+    const rowOffset = (Math.abs(row) % 2) * 0.5 * sqrt3;
+    const col = Math.round((worldX - rowOffset) / sqrt3);
+
+    const hexIndex = row * selectedMapWidth + col;
+    
+    const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
+    mapState.setHexOwner(hexIndex, newMask);
+    modifyBuffer(bufferFill, hexIndex, [newMask]);
+    
+    const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex)];
+    calculateHexMaskIndex(hexToUpdate);
+
+    for (const hexToUpdateIndex of hexToUpdate) {
+      modifyBuffer(bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
+    }
+    
+    scheduleRender();
+
     dragging = true;
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
@@ -238,7 +290,7 @@ function initEventHandlers() {
     canvas.releasePointerCapture(e.pointerId);
     scheduleRender();
   };
-
+  
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointerleave", endDrag);
   window.addEventListener("resize", onResize);
