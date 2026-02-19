@@ -67,3 +67,10 @@ Rozdzial 3 - Generacja mapy:
         - b) dlaczego nie z-curve
     - opisanie MapState jak z niego korzystamy, co tam sie dzieje
     - optymalizacja generowania (co usunieto, 5 s -> 70 ms)
+
+
+---
+Punkty tymczasowo bez rozdziału  
+
+
+- Po kliknieciu zmiana koloru i masek -> 72ms do 0,5 ms

@@ -27,7 +27,7 @@ const mapWidth = {
   LIFETIME: 2048
 };
 
-export const selectedMapWidth = mapWidth.LIFETIME;
+export const selectedMapWidth = mapWidth.EXTRA;
 const totalHexCount = selectedMapWidth ** 2;
 
 /** @type {HTMLInputElement} */
@@ -173,11 +173,12 @@ function initBuffer(location, data, size) {
 /**
  *
  * @param buffer {WebGLBuffer}
+ * @param offset {number}
  * @param data {ArrayLike<>}
  */
-function modifyBuffer(buffer, data) {
+function modifyBuffer(buffer,offset,  data) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(data));
+  gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT , new Float32Array(data));
 }
 
 function draw() {
@@ -251,11 +252,18 @@ function initEventHandlers() {
     const col = Math.round((worldX - rowOffset) / sqrt3);
 
     const hexIndex = row * selectedMapWidth + col;
-    mapState.setHexOwner(hexIndex, makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false));
-    modifyBuffer(bufferFill, mapState.fillMasksArray);
+    
+    const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
+    mapState.setHexOwner(hexIndex, newMask);
+    modifyBuffer(bufferFill, hexIndex, [newMask]);
+    
     const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex)];
     calculateHexMaskIndex(hexToUpdate);
-    modifyBuffer(bufferEdge, mapState.edgeMasksArray);
+
+    for (const hexToUpdateIndex of hexToUpdate) {
+      modifyBuffer(bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
+    }
+    
     scheduleRender();
 
     dragging = true;
