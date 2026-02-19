@@ -120,31 +120,30 @@ function calculateHexMaskIndex(indices) {
     0b001000  // UpperLeft
   ];
 
-  indices.forEach(currentIndex => {
+  for (const currentIndex of indices) {
     const neighbors = getHexNeighbors(currentIndex);
     const currentOwner = mapState.hexOwners[currentIndex];
     let mask = 0;
 
-    neighbors.forEach((neighborId, i) => {
+    for (const neighborId of neighbors) {
+      const i = neighbors.indexOf(neighborId);
       if (currentOwner !== mapState.hexOwners[neighborId]) {mask |= neighborMasks[i];}
-    });
+    }
 
     mapState.calculatedEdgeMasks[currentIndex] = mask;
-  });
+  }
 }
 
 generateHexMaskFirst();
 
 const bufferFill = initBuffer(
   locations.fillColorMask,
-  ///** @type {ArrayLike<>} */ precalculatedFillMask,
   mapState.fillMasksArray,
   1,
 );
 
 const bufferEdge = initBuffer(
   locations.edgeMask,
-  ///** @type {ArrayLike<>} */ precalculatedEdgeMasks,
   mapState.edgeMasksArray,
   1,
 );
@@ -156,8 +155,8 @@ initEventHandlers();
 /**
  *
  * @param location {GLuint}
- * @param data {ArrayLike<>}
- * @param size {}
+ * @param data {ArrayLike<unknown>}
+ * @param size {number}
  * @returns {WebGLBuffer}
  */
 function initBuffer(location, data, size) {
@@ -174,7 +173,7 @@ function initBuffer(location, data, size) {
  *
  * @param buffer {WebGLBuffer}
  * @param offset {number}
- * @param data {ArrayLike<>}
+ * @param data {ArrayLike<unknown> | unknown[]}
  */
 function modifyBuffer(buffer,offset,  data) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
