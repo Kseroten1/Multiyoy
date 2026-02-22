@@ -1,7 +1,9 @@
+/** @type {string} */
 import vertexShaderString from './shaders/vertexShader.glsl?raw';
+/** @type {string} */
 import fragmentShaderString from './shaders/fragmentShader.glsl?raw';
-import {COLOR_TABLE_EDGE, COLOR_TABLE_FILL} from './utils/config.js';
-import {createShader} from "./utils/glUtils.js";
+import {COLOR_TABLE_FILL} from './utils/config.js';
+import {buildWebGLProgram, getShaderLocations, initBuffer, modifyBuffer} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
@@ -40,8 +42,13 @@ bInput.max = maxB;
 sInput.max = maxS;
 
 const canvas = document.getElementById("main");
+const secondaryCanvas = document.getElementById("secondary");
 /** @type {WebGL2RenderingContext} */
 const gl = canvas.getContext("webgl2", {colorSpace: "display-p3"});
+
+/** @type {WebGL2RenderingContext} */
+const gl2 = secondaryCanvas.getContext("webgl2", {colorSpace: "display-p3"});
+
 /**
  * Used for controls related calculations (camera origin, zoom, pan)
  * @type {DOMMatrix}
@@ -53,42 +60,33 @@ const viewMatrix = new DOMMatrix().scaleSelf(15);
  */
 let projectionMatrix = new DOMMatrix();
 
-const program = gl.createProgram();
-const vertShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderString);
-const fragShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderString);
-const vao = gl.createVertexArray();
 
-gl.attachShader(program, vertShader);
-gl.attachShader(program, fragShader);
-gl.linkProgram(program);
 
-const locations = {
-  mvp: gl.getUniformLocation(program, "u_mvp"),
-  borderWidth: gl.getUniformLocation(program, "u_borderWidth"),
-  mapWidth: gl.getUniformLocation(program, "u_mapWidth"),
+const {program: mainHexProgram, vao: mainHexVao} = buildWebGLProgram(gl, vertexShaderString, fragmentShaderString);
+const {program: secondHexProgram, vao: secondHexVao } = buildWebGLProgram(gl2, vertexShaderString, fragmentShaderString);
 
-  edgeMask: gl.getAttribLocation(program, "a_edgeMask"),
-  fillColorMask: gl.getAttribLocation(program, "a_fillColorMask"),
-
-  fillColors: gl.getUniformLocation(program, "FILL_COLORS"),
-  edgeColors: gl.getUniformLocation(program, "EDGE_COLORS"),
-};
+const mainHexProgramLocations = getShaderLocations(gl, mainHexProgram);
+const secondHexProgramLocations = getShaderLocations(gl2, secondHexProgram);
 
 const fillRgb = getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL);
-const edgeRgb = getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_EDGE); // TODO: Wywalić tą table (kosztem debug mode) i wstawić const czarny w shader
 
-gl.useProgram(program);
-gl.bindVertexArray(vao);
-gl.uniform3fv(locations.fillColors, new Float32Array(fillRgb));
-gl.uniform3fv(locations.edgeColors, new Float32Array(edgeRgb));
-gl.uniform1f(locations.borderWidth, CONFIG.defaultBorderWidth);
-gl.uniform1i(locations.mapWidth, selectedMapWidth);
+function updateSelectableeUniforms (context, programLocations) {
+  context.uniform3fv(programLocations.fillColors, new Float32Array(fillRgb));
+  context.uniform1f(programLocations.borderWidth, CONFIG.defaultBorderWidth);
+  context.uniform1i(programLocations.mapWidth, selectedMapWidth);
+}
+
+updateSelectableeUniforms(gl, mainHexProgramLocations);
+updateSelectableeUniforms(gl2, secondHexProgramLocations);
+
+gl.uniform1i(mainHexProgramLocations.hexIndex, -1);
 
 const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
 for (let i = 0; i < totalHexCount; i ++) {
   mapState.setHexStateIndex(i, 1);
   mapState.setHexOwner(i, Math.random() > 0.5 ? makeHexColorMask(2, 2, false) : makeHexColorMask(4, 4, false));
+  // TODO: uniemożliwić losowanie koloru U**ainy
   mapState.calculatedEdgeMasks[i] = 0b000000;
 }
 
@@ -137,56 +135,69 @@ function calculateHexMaskIndex(indices) {
 generateHexMaskFirst();
 
 const bufferFill = initBuffer(
-  locations.fillColorMask,
+  gl,
+  mainHexProgramLocations.fillColorMask,
   mapState.fillMasksArray,
   1,
 );
 
 const bufferEdge = initBuffer(
-  locations.edgeMask,
+  gl,
+  mainHexProgramLocations.edgeMask,
   mapState.edgeMasksArray,
   1,
 );
+
+const secondHexBufferFill = initBuffer(
+  gl2,
+  secondHexProgramLocations.fillColorMask,
+  [5],
+  1,
+)
+
+const secondHexBufferEdge = initBuffer(
+  gl2,
+  secondHexProgramLocations.edgeMask,
+  [5],
+  1,
+)
 
 onResize();
 scheduleRender();
 initEventHandlers();
 
-/**
- *
- * @param location {GLuint}
- * @param data {ArrayLike<unknown>}
- * @param size {number}
- * @returns {WebGLBuffer}
- */
-function initBuffer(location, data, size) {
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.enableVertexAttribArray(location);
-  gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
-  gl.vertexAttribDivisor(location, 1);
-  return buffer;
-}
 
-/**
- *
- * @param buffer {WebGLBuffer}
- * @param offset {number}
- * @param data {ArrayLike<unknown> | unknown[]}
- */
-function modifyBuffer(buffer,offset,  data) {
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT , new Float32Array(data));
+function highlightHex(mouseX, mouseY) {
+  const rect = secondaryCanvas.getBoundingClientRect();
+  const viewCenterX = window.innerWidth / 2;
+  const viewCenterY = window.innerHeight / 2;
+
+  const screenX = mouseX - rect.left - viewCenterX;
+  const screenY = mouseY - rect.top - viewCenterY;
+  const inv = viewMatrix.inverse();
+  const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
+
+  const sqrt3 = 1.73205081;
+  const row = Math.round(worldY / 1.5);
+  const rowOffset = (Math.abs(row) % 2) * 0.5 * sqrt3;
+  const col = Math.round((worldX - rowOffset) / sqrt3);
+
+  const hexIndex = row * selectedMapWidth + col;
+  const highlightOwner = mapState.getHexOwner(hexIndex);
+  gl2.uniform1i(secondHexProgramLocations.hexIndex, hexIndex);
+  gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.5, sInput.value * 1.5, COLOR_TABLE_FILL))
+  modifyBuffer(gl2, secondHexBufferFill, 0, [highlightOwner]);
+  modifyBuffer(gl2, secondHexBufferEdge, 0, [mapState.edgeMasksArray[hexIndex]]);
+//  const mvp = projectionMatrix.multiply(viewMatrix);
 }
 
 function draw() {
   state.renderRequestId = null;
-  gl.useProgram(program);
-  gl.bindVertexArray(vao);
   const mvp = projectionMatrix.multiply(viewMatrix);
-  gl.uniformMatrix4fv(locations.mvp, false, mvp.toFloat32Array());
+  gl.uniformMatrix4fv(mainHexProgramLocations.mvp, false, mvp.toFloat32Array());
   gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, totalHexCount);
+  gl2.uniformMatrix4fv(secondHexProgramLocations.mvp, false, mvp.toFloat32Array());
+  gl2.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, 1);
 }
 
 function scheduleRender() {
@@ -198,8 +209,11 @@ function onResize() {
   const dpr = window.devicePixelRatio;
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
-
+  secondaryCanvas.width = window.innerWidth * dpr;
+  secondaryCanvas.height = window.innerHeight * dpr;
+  
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  gl2.viewport(0, 0, gl2.canvas.width, gl2.canvas.height);
   projectionMatrix = new DOMMatrix().scaleSelf(2 / window.innerWidth, -2 / window.innerHeight);
   scheduleRender();
 }
@@ -207,8 +221,8 @@ function onResize() {
 function initEventHandlers() {
   let dragging = false;
   const lastPosition = { x: 0, y: 0 };
-
-  canvas.addEventListener("wheel", (e) => {
+  
+  secondaryCanvas.addEventListener("wheel", (e) => {
     e.preventDefault();
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
@@ -234,9 +248,9 @@ function initEventHandlers() {
     scheduleRender();
   }, { passive: false });
 
-  canvas.addEventListener("pointerdown", (e) => {
+  secondaryCanvas.addEventListener("pointerdown", (e) => {
     if (dragging) return;
-    const rect = canvas.getBoundingClientRect();
+    const rect = secondaryCanvas.getBoundingClientRect();
     const viewCenterX = window.innerWidth / 2;
     const viewCenterY = window.innerHeight / 2;
 
@@ -254,13 +268,13 @@ function initEventHandlers() {
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
     mapState.setHexOwner(hexIndex, newMask);
-    modifyBuffer(bufferFill, hexIndex, [newMask]);
+    modifyBuffer(gl, bufferFill, hexIndex, [newMask]);
     
     const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex)];
     calculateHexMaskIndex(hexToUpdate);
 
     for (const hexToUpdateIndex of hexToUpdate) {
-      modifyBuffer(bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
+      modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
     
     scheduleRender();
@@ -268,10 +282,12 @@ function initEventHandlers() {
     dragging = true;
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
-    canvas.setPointerCapture(e.pointerId);
+    secondaryCanvas.setPointerCapture(e.pointerId);
   });
 
-  canvas.addEventListener("pointermove", (e) => {
+  secondaryCanvas.addEventListener("pointermove", (e) => {
+    highlightHex(e.clientX, e.clientY);
+    scheduleRender();
     if (!dragging) { return; }
     const deltaX = e.clientX - lastPosition.x;
     const deltaY = e.clientY - lastPosition.y;
@@ -287,17 +303,16 @@ function initEventHandlers() {
     if (!dragging) { return; }
     dragging = false;
 
-    canvas.releasePointerCapture(e.pointerId);
+    secondaryCanvas.releasePointerCapture(e.pointerId);
     scheduleRender();
   };
   
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointerleave", endDrag);
+  secondaryCanvas.addEventListener("pointerup", endDrag);
+  secondaryCanvas.addEventListener("pointerleave", endDrag);
   window.addEventListener("resize", onResize);
 
   function onInputChange() {
-    gl.uniform3fv(locations.fillColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL));
-    gl.uniform3fv(locations.edgeColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_EDGE));
+    gl.uniform3fv(mainHexProgramLocations.fillColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL));
     scheduleRender();
   }
 

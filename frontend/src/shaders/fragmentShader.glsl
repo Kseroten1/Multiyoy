@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 
-uniform vec3 EDGE_COLORS[6];
+//uniform vec3 EDGE_COLORS[6];
 uniform vec3 FILL_COLORS[14];
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
 
@@ -16,7 +16,7 @@ const float cos60 = cos(radians(60.0));
 const float sin60 = sin(radians(60.0));
 const vec3 fillColor = vec3(1.0, 1.0, 1.0);
 
-
+ 
 const vec2 HEX_OFFSETS[6] = vec2[](
     vec2(cos(radians(90.0)),   sin(radians(90.0))),   // V0 – góra
     vec2(cos(radians(30.0)),   sin(radians(30.0))),   // V1 – prawy‑góra
@@ -83,12 +83,12 @@ void main() {
     float currentMask = currentSideOn * step(distanceCurrent, u_borderWidth);
     float prevMask = previousSideOn * step(distancePrevious, u_borderWidth);
     float nextMask = nextSideOn * step(distanceNext, u_borderWidth);
-
+    vec3 edgeColor = vec3(0.0, 0.0, 0.0);
     vec3 color =
     baseFillColor * (1.0 - currentMask) * (1.0 - prevMask) * (1.0 - nextMask) +
-    EDGE_COLORS[nextEdgeID] * nextMask * (1.0 - prevMask) * (1.0 - currentMask) +
-    EDGE_COLORS[previousEdgeID] * prevMask * (1.0 - currentMask) +
-    EDGE_COLORS[edgeID] * currentMask;
+    edgeColor * nextMask * (1.0 - prevMask) * (1.0 - currentMask) +
+    edgeColor * prevMask * (1.0 - currentMask) +
+    edgeColor * currentMask;
 
     outColor = vec4(color, 1.0);
 }
