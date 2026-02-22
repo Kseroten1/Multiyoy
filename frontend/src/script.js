@@ -80,6 +80,8 @@ updateSelectableeUniforms(gl, mainHexProgramLocations);
 updateSelectableeUniforms(gl2, secondHexProgramLocations);
 
 gl.uniform1i(mainHexProgramLocations.hexIndex, -1);
+gl.uniform3fv(mainHexProgramLocations.edgeColor, [0.0, 0.0, 0.0]);
+gl2.uniform3fv(secondHexProgramLocations.edgeColor, [1.0, 1.0, 1.0]);
 
 const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
 
@@ -188,7 +190,6 @@ function highlightHex(mouseX, mouseY) {
   gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.5, sInput.value * 1.5, COLOR_TABLE_FILL))
   modifyBuffer(gl2, secondHexBufferFill, 0, [highlightOwner]);
   modifyBuffer(gl2, secondHexBufferEdge, 0, [mapState.edgeMasksArray[hexIndex]]);
-//  const mvp = projectionMatrix.multiply(viewMatrix);
 }
 
 function draw() {
@@ -276,6 +277,7 @@ function initEventHandlers() {
     for (const hexToUpdateIndex of hexToUpdate) {
       modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
+    highlightHex(e.clientX, e.clientY);
     
     scheduleRender();
 

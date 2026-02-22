@@ -4,6 +4,7 @@ precision highp float;
 //uniform vec3 EDGE_COLORS[6];
 uniform vec3 FILL_COLORS[14];
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
+uniform vec3 u_edgeColor;
 
 flat in float v_edgeMask;  // maska krawedzi 
 flat in float v_fillColorMask;
@@ -83,7 +84,7 @@ void main() {
     float currentMask = currentSideOn * step(distanceCurrent, u_borderWidth);
     float prevMask = previousSideOn * step(distancePrevious, u_borderWidth);
     float nextMask = nextSideOn * step(distanceNext, u_borderWidth);
-    vec3 edgeColor = vec3(0.0, 0.0, 0.0);
+    vec3 edgeColor = u_edgeColor;
     vec3 color =
     baseFillColor * (1.0 - currentMask) * (1.0 - prevMask) * (1.0 - nextMask) +
     edgeColor * nextMask * (1.0 - prevMask) * (1.0 - currentMask) +

@@ -36,7 +36,7 @@ export function getShaderLocations(context, program) {
     mapWidth: context.getUniformLocation(program, "u_mapWidth"),
     hexIndex: context.getUniformLocation(program, "u_index"),
 
-    edgeMask: context.getAttribLocation(program, "a_edgeMask"),
+    edgeColor: context.getUniformLocation(program, "u_edgeColor"),
     fillColorMask: context.getAttribLocation(program, "a_fillColorMask"),
 
     fillColors: context.getUniformLocation(program, "FILL_COLORS"),
