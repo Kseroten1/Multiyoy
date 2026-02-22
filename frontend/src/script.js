@@ -70,14 +70,14 @@ const secondHexProgramLocations = getShaderLocations(gl2, secondHexProgram);
 
 const fillRgb = getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL);
 
-function updateSelectableeUniforms (context, programLocations) {
+function updateSelectableUniforms (context, programLocations) {
   context.uniform3fv(programLocations.fillColors, new Float32Array(fillRgb));
   context.uniform1f(programLocations.borderWidth, CONFIG.defaultBorderWidth);
   context.uniform1i(programLocations.mapWidth, selectedMapWidth);
 }
 
-updateSelectableeUniforms(gl, mainHexProgramLocations);
-updateSelectableeUniforms(gl2, secondHexProgramLocations);
+updateSelectableUniforms(gl, mainHexProgramLocations);
+updateSelectableUniforms(gl2, secondHexProgramLocations);
 
 gl.uniform1i(mainHexProgramLocations.hexIndex, -1);
 gl.uniform3fv(mainHexProgramLocations.edgeColor, [0.0, 0.0, 0.0]);
@@ -153,14 +153,14 @@ const bufferEdge = initBuffer(
 const secondHexBufferFill = initBuffer(
   gl2,
   secondHexProgramLocations.fillColorMask,
-  [5],
+  [null],
   1,
 )
 
 const secondHexBufferEdge = initBuffer(
   gl2,
   secondHexProgramLocations.edgeMask,
-  [5],
+  [null],
   1,
 )
 
@@ -170,12 +170,10 @@ initEventHandlers();
 
 
 function highlightHex(mouseX, mouseY) {
-  const rect = secondaryCanvas.getBoundingClientRect();
   const viewCenterX = window.innerWidth / 2;
   const viewCenterY = window.innerHeight / 2;
-
-  const screenX = mouseX - rect.left - viewCenterX;
-  const screenY = mouseY - rect.top - viewCenterY;
+  const screenX = mouseX - viewCenterX;
+  const screenY = mouseY - viewCenterY;
   const inv = viewMatrix.inverse();
   const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
 
@@ -251,12 +249,11 @@ function initEventHandlers() {
 
   secondaryCanvas.addEventListener("pointerdown", (e) => {
     if (dragging) return;
-    const rect = secondaryCanvas.getBoundingClientRect();
     const viewCenterX = window.innerWidth / 2;
     const viewCenterY = window.innerHeight / 2;
 
-    const screenX = e.clientX - rect.left - viewCenterX;
-    const screenY = e.clientY - rect.top - viewCenterY;
+    const screenX = e.clientX - viewCenterX;
+    const screenY = e.clientY - viewCenterY;
     const inv = viewMatrix.inverse();
     const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
 

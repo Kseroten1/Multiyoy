@@ -1,7 +1,6 @@
 #version 300 es
 precision highp float;
 
-//uniform vec3 EDGE_COLORS[6];
 uniform vec3 FILL_COLORS[14];
 uniform float u_borderWidth;  // szerokość krawedzi w jednostkach lokalnych
 uniform vec3 u_edgeColor;
