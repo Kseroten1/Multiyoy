@@ -22,7 +22,7 @@ export function getHexNeighbors(index) {
  * @param matrix {DOMMatrix}
  * @returns {number}
  */
-export function getHexIndexFromCoords(mouseX, mouseY, matrix) {
+export function getHexIndexFromMouseCoords(mouseX, mouseY, matrix) {
   const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY, matrix);
   const sqrt3 = 1.73205081;
   const row = Math.round(worldY / 1.5);
@@ -30,6 +30,6 @@ export function getHexIndexFromCoords(mouseX, mouseY, matrix) {
   const col = Math.round((worldX - rowOffset) / sqrt3);
 
   // Zabezpieczenie przed wyjściem poza zakres
-  if (col < 0 || col >= selectedMapWidth || row < 0) return -1;
+  if (col < 0 || col >= selectedMapWidth || row < 0 || row >= selectedMapWidth) return -1;
   return row * selectedMapWidth + col;
 }

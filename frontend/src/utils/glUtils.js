@@ -55,6 +55,7 @@ export function getShaderLocations(context, program) {
 export function initBuffer(context, location, data, size) {
   const buffer = context.createBuffer();
   context.bindBuffer(context.ARRAY_BUFFER, buffer);
+  // we need to specify that data will be used for whole hexagons rather than individual vertices
   context.enableVertexAttribArray(location);
   context.vertexAttribPointer(location, size, context.FLOAT, false, 0, 0);
   context.bufferData(context.ARRAY_BUFFER, new Float32Array(data), context.DYNAMIC_DRAW);

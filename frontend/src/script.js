@@ -8,7 +8,7 @@ import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
 import {makeHexColorMask} from "./utils/math.js";
-import {getHexIndexFromCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
+import {getHexIndexFromMouseCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
 
 const state = {
   renderRequestId: null,
@@ -41,13 +41,13 @@ const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
 bInput.max = maxB;
 sInput.max = maxS;
 
-const canvas = document.getElementById("main");
-const secondaryCanvas = document.getElementById("secondary");
+const mainCanvas = document.getElementById("main");
+const highlightCanvas = document.getElementById("secondary");
 /** @type {WebGL2RenderingContext} */
-const gl = canvas.getContext("webgl2", {colorSpace: "display-p3"});
+const gl = mainCanvas.getContext("webgl2", {colorSpace: "display-p3"});
 
 /** @type {WebGL2RenderingContext} */
-const gl2 = secondaryCanvas.getContext("webgl2", {colorSpace: "display-p3"});
+const gl2 = highlightCanvas.getContext("webgl2", {colorSpace: "display-p3"});
 
 /**
  * Used for controls related calculations (camera origin, zoom, pan)
@@ -79,8 +79,11 @@ function updateSelectableUniforms (context, programLocations) {
 updateSelectableUniforms(gl, mainHexProgramLocations);
 updateSelectableUniforms(gl2, secondHexProgramLocations);
 
+// this ensures shader uses its instanceID as index for main canvas
 gl.uniform1i(mainHexProgramLocations.hexIndex, -1);
+// setting edge color to black for main canvas
 gl.uniform3fv(mainHexProgramLocations.edgeColor, [0.0, 0.0, 0.0]);
+// setting edge color to white for highlight canvas
 gl2.uniform3fv(secondHexProgramLocations.edgeColor, [1.0, 1.0, 1.0]);
 
 const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
@@ -136,6 +139,8 @@ function calculateHexMaskIndex(indices) {
 
 generateHexMaskFirst();
 
+const emptyData = new Float32Array(totalHexCount);
+
 const bufferFill = initBuffer(
   gl,
   mainHexProgramLocations.fillColorMask,
@@ -153,14 +158,14 @@ const bufferEdge = initBuffer(
 const secondHexBufferFill = initBuffer(
   gl2,
   secondHexProgramLocations.fillColorMask,
-  Array(totalHexCount).fill(0),
+  emptyData,
   1,
 )
 
 const secondHexBufferEdge = initBuffer(
   gl2,
   secondHexProgramLocations.edgeMask,
-  Array(totalHexCount).fill(0),
+  emptyData,
   1,
 )
 
@@ -170,7 +175,7 @@ initEventHandlers();
 
 
 function highlightHex(mouseX, mouseY) {
-  const hexIndex = getHexIndexFromCoords(mouseX, mouseY, viewMatrix);
+  const hexIndex = getHexIndexFromMouseCoords(mouseX, mouseY, viewMatrix);
   const highlightOwner = mapState.hexOwners[hexIndex];
   gl2.uniform1i(secondHexProgramLocations.hexIndex, hexIndex);
   gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.5, sInput.value * 1.5, COLOR_TABLE_FILL))
@@ -194,10 +199,10 @@ function scheduleRender() {
 
 function onResize() {
   const dpr = window.devicePixelRatio;
-  canvas.width = window.innerWidth * dpr;
-  canvas.height = window.innerHeight * dpr;
-  secondaryCanvas.width = window.innerWidth * dpr;
-  secondaryCanvas.height = window.innerHeight * dpr;
+  mainCanvas.width = window.innerWidth * dpr;
+  mainCanvas.height = window.innerHeight * dpr;
+  highlightCanvas.width = window.innerWidth * dpr;
+  highlightCanvas.height = window.innerHeight * dpr;
   
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl2.viewport(0, 0, gl2.canvas.width, gl2.canvas.height);
@@ -209,7 +214,7 @@ function initEventHandlers() {
   let dragging = false;
   const lastPosition = { x: 0, y: 0 };
   
-  secondaryCanvas.addEventListener("wheel", (e) => {
+  highlightCanvas.addEventListener("wheel", (e) => {
     e.preventDefault();
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
@@ -235,10 +240,10 @@ function initEventHandlers() {
     scheduleRender();
   }, { passive: false });
 
-  secondaryCanvas.addEventListener("pointerdown", (e) => {
+  highlightCanvas.addEventListener("pointerdown", (e) => {
     if (dragging) return;
 
-    const hexIndex = getHexIndexFromCoords(e.clientX, e.clientY, viewMatrix);
+    const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix);
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
     mapState.setHexOwner(hexIndex, newMask);
@@ -257,10 +262,10 @@ function initEventHandlers() {
     dragging = true;
     lastPosition.x = e.clientX;
     lastPosition.y = e.clientY;
-    secondaryCanvas.setPointerCapture(e.pointerId);
+    highlightCanvas.setPointerCapture(e.pointerId);
   });
 
-  secondaryCanvas.addEventListener("pointermove", (e) => {
+  highlightCanvas.addEventListener("pointermove", (e) => {
     highlightHex(e.clientX, e.clientY);
     scheduleRender();
     if (!dragging) { return; }
@@ -278,12 +283,12 @@ function initEventHandlers() {
     if (!dragging) { return; }
     dragging = false;
 
-    secondaryCanvas.releasePointerCapture(e.pointerId);
+    highlightCanvas.releasePointerCapture(e.pointerId);
     scheduleRender();
   };
   
-  secondaryCanvas.addEventListener("pointerup", endDrag);
-  secondaryCanvas.addEventListener("pointerleave", endDrag);
+  highlightCanvas.addEventListener("pointerup", endDrag);
+  highlightCanvas.addEventListener("pointerleave", endDrag);
   window.addEventListener("resize", onResize);
 
   function onInputChange() {

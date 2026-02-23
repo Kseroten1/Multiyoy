@@ -27,12 +27,12 @@ out vec2 v_local;
 void main() {
     float is_provided = step(0.0, float(u_index));
     int idx = int(mix(float(gl_InstanceID), float(u_index), is_provided));
-    int r = idx / u_mapWidth;
+    int row = idx / u_mapWidth;
     int col = idx % u_mapWidth;
 
     float sqrt3 = 1.73205081;
-    float x = float(col) * sqrt3 + float(r & 1) * 0.5 * sqrt3;
-    float y = float(r) * 1.5;
+    float x = float(col) * sqrt3 + float(row & 1) * 0.5 * sqrt3;
+    float y = float(row) * 1.5;
     vec2 center = vec2(x, y);
 
     vec2 localPos = HEX_OFFSETS[gl_VertexID];
