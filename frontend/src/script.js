@@ -8,7 +8,7 @@ import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {MapState} from "./utils/mapState.js";
 import {makeHexColorMask} from "./utils/math.js";
-import {getHexNeighbors} from "./utils/hexLogicHelper.js";
+import {getHexIndexFromCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
 
 const state = {
   renderRequestId: null,
@@ -153,14 +153,14 @@ const bufferEdge = initBuffer(
 const secondHexBufferFill = initBuffer(
   gl2,
   secondHexProgramLocations.fillColorMask,
-  [null],
+  Array(totalHexCount).fill(0),
   1,
 )
 
 const secondHexBufferEdge = initBuffer(
   gl2,
   secondHexProgramLocations.edgeMask,
-  [null],
+  Array(totalHexCount).fill(0),
   1,
 )
 
@@ -170,20 +170,8 @@ initEventHandlers();
 
 
 function highlightHex(mouseX, mouseY) {
-  const viewCenterX = window.innerWidth / 2;
-  const viewCenterY = window.innerHeight / 2;
-  const screenX = mouseX - viewCenterX;
-  const screenY = mouseY - viewCenterY;
-  const inv = viewMatrix.inverse();
-  const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
-
-  const sqrt3 = 1.73205081;
-  const row = Math.round(worldY / 1.5);
-  const rowOffset = (Math.abs(row) % 2) * 0.5 * sqrt3;
-  const col = Math.round((worldX - rowOffset) / sqrt3);
-
-  const hexIndex = row * selectedMapWidth + col;
-  const highlightOwner = mapState.getHexOwner(hexIndex);
+  const hexIndex = getHexIndexFromCoords(mouseX, mouseY, viewMatrix);
+  const highlightOwner = mapState.hexOwners[hexIndex];
   gl2.uniform1i(secondHexProgramLocations.hexIndex, hexIndex);
   gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.5, sInput.value * 1.5, COLOR_TABLE_FILL))
   modifyBuffer(gl2, secondHexBufferFill, 0, [highlightOwner]);
@@ -249,20 +237,8 @@ function initEventHandlers() {
 
   secondaryCanvas.addEventListener("pointerdown", (e) => {
     if (dragging) return;
-    const viewCenterX = window.innerWidth / 2;
-    const viewCenterY = window.innerHeight / 2;
 
-    const screenX = e.clientX - viewCenterX;
-    const screenY = e.clientY - viewCenterY;
-    const inv = viewMatrix.inverse();
-    const {x: worldX, y: worldY} = new DOMPoint(screenX, screenY).matrixTransform(inv);
-
-    const sqrt3 = 1.73205081;
-    const row = Math.round(worldY / 1.5);
-    const rowOffset = (Math.abs(row) % 2) * 0.5 * sqrt3;
-    const col = Math.round((worldX - rowOffset) / sqrt3);
-
-    const hexIndex = row * selectedMapWidth + col;
+    const hexIndex = getHexIndexFromCoords(e.clientX, e.clientY, viewMatrix);
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
     mapState.setHexOwner(hexIndex, newMask);
