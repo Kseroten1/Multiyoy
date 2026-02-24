@@ -29,7 +29,7 @@ const mapWidth = {
   LIFETIME: 2048
 };
 
-export const selectedMapWidth = mapWidth.EXTRA;
+export const selectedMapWidth = mapWidth.LIFETIME;
 const totalHexCount = selectedMapWidth ** 2;
 
 /** @type {HTMLInputElement} */
@@ -160,14 +160,14 @@ const secondHexBufferFill = initBuffer(
   secondHexProgramLocations.fillColorMask,
   emptyData,
   1,
-)
+);
 
 const secondHexBufferEdge = initBuffer(
   gl2,
   secondHexProgramLocations.edgeMask,
   emptyData,
   1,
-)
+);
 
 onResize();
 scheduleRender();
@@ -293,6 +293,7 @@ function initEventHandlers() {
 
   function onInputChange() {
     gl.uniform3fv(mainHexProgramLocations.fillColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL));
+    gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.2, sInput.value * 1.2, COLOR_TABLE_FILL));
     scheduleRender();
   }
 
