@@ -1,4 +1,5 @@
 import {selectedMapWidth} from "../script.js";
+import {screenToWorld} from "./math.js";
 
 export function getHexNeighbors(index) {
   const r = Math.floor(index / selectedMapWidth);
@@ -12,4 +13,23 @@ export function getHexNeighbors(index) {
     index - selectedMapWidth + isRowOdd,        // 4: UpperRight
     index - selectedMapWidth + isRowOdd - 1,    // 5: UpperLeft
   ];
+}
+
+/**
+ * 
+ * @param mouseX {number}
+ * @param mouseY {number}
+ * @param matrix {DOMMatrix}
+ * @returns {number}
+ */
+export function getHexIndexFromMouseCoords(mouseX, mouseY, matrix) {
+  const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY, matrix);
+  const sqrt3 = 1.73205081;
+  const row = Math.round(worldY / 1.5);
+  const rowOffset = (Math.abs(row) % 2) * 0.5 * sqrt3;
+  const col = Math.round((worldX - rowOffset) / sqrt3);
+
+  // Zabezpieczenie przed wyjściem poza zakres
+  if (col < 0 || col >= selectedMapWidth || row < 0 || row >= selectedMapWidth) return -1;
+  return row * selectedMapWidth + col;
 }
