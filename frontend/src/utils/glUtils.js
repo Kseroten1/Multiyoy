@@ -37,7 +37,8 @@ export function getShaderLocations(context, program) {
     hexIndex: context.getUniformLocation(program, "u_index"),
 
     edgeColor: context.getUniformLocation(program, "u_edgeColor"),
-    edgeMask: context.getUniformLocation(program, "a_edgeMask"),
+    hexIndexAttrib: context.getAttribLocation(program, "a_hexIndex"),
+    edgeMask: context.getAttribLocation(program, "a_edgeMask"),
     fillColorMask: context.getAttribLocation(program, "a_fillColorMask"),
 
     fillColors: context.getUniformLocation(program, "FILL_COLORS"),
@@ -70,7 +71,7 @@ export function initBuffer(context, location, data, size) {
  * @param offset {number}
  * @param data {ArrayLike<unknown> | unknown[]}
  */
-export function modifyBuffer(context, buffer,offset,  data) {
+export function modifyBuffer(context, buffer, offset, data) {
   context.bindBuffer(context.ARRAY_BUFFER, buffer);
   context.bufferSubData(context.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT , new Float32Array(data));
 }

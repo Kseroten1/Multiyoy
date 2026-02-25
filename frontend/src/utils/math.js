@@ -74,7 +74,7 @@ export function makeMask(edgesEnabled) {
  *
  * @param color1 {number}
  * @param color2 {number}
- * @param isVertical {boolean}
+ * @param isVertical {boolean || number}
  * @returns {number}
  */
 export function makeHexColorMask(color1, color2, isVertical) {

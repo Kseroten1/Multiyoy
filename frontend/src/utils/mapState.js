@@ -5,26 +5,55 @@ import {encodeRowMajor} from "./rowMajor.js";
 function calculateMapStateDimensions(playerCount, hexCount) {
   const provinceCount = hexCount / 4;
 
+  let currentOffset = 0;
+
   const hexCountInBytes = 3;
-  const hexCountOffset = 0;
+  const hexCountOffset = currentOffset;
+  currentOffset += hexCountInBytes;
+
   const playerCountInBytes = 2;
-  const playerCountOffset = hexCountInBytes + hexCountOffset;
+  const playerCountOffset = currentOffset;
+  currentOffset += playerCountInBytes;
+
   const currentPlayerInBytes = 2;
-  const currentPlayerOffset = playerCountInBytes + playerCountOffset;
+  const currentPlayerOffset = currentOffset;
+  currentOffset += currentPlayerInBytes;
+
   const currentRoundInBytes = 4;
-  const currentRoundOffset = currentPlayerInBytes + currentPlayerOffset;
+  const currentRoundOffset = currentOffset;
+  currentOffset += currentRoundInBytes;
+
   const provinceCountInBytes = 4;
-  const provinceCountOffset = currentRoundInBytes + currentRoundOffset;
+  const provinceCountOffset = currentOffset;
+  currentOffset += provinceCountInBytes;
+
   const hexStateInBytesPerElement = 1;
-  const hexStateOffset = provinceCountInBytes + provinceCountOffset;
-  const hexOwnerInBytesPerElement = playerCountInBytes;
-  const hexOwnerOffset = hexStateOffset + hexStateInBytesPerElement * hexCount;
-  const hexProvinceIdInBytesPerElement = provinceCountInBytes;
-  const hexProvinceIdOffset = hexOwnerOffset + hexOwnerInBytesPerElement * hexCount;
+  const hexStateOffset = currentOffset;
+  currentOffset += hexStateInBytesPerElement * hexCount;
+
+  // Align for Uint16Array (2 bytes)
+  if (currentOffset % 2 !== 0) currentOffset++;
+  const hexOwnerInBytesPerElement = 2;
+  const hexOwnerOffset = currentOffset;
+  currentOffset += hexOwnerInBytesPerElement * hexCount;
+
+  // Align for Uint32Array (2 bytes)
+  if (currentOffset % 2 !== 0) currentOffset++;
+  const hexProvinceIdInBytesPerElement = 4;
+  const hexProvinceIdOffset = currentOffset;
+  currentOffset += hexProvinceIdInBytesPerElement * hexCount;
+
+  // Align for maxProvinceFinance (2 bytes)
+  if (currentOffset % 2 !== 0) currentOffset++;
   const maxProvinceFinanceInBytes = 4;
-  const maxProvinceFinanceOffset = hexProvinceIdOffset + hexProvinceIdInBytesPerElement * hexCount;
-  const provinceFinanceStateInBytesPerElement = maxProvinceFinanceInBytes;
-  const provinceFinanceStateOffset = maxProvinceFinanceOffset + maxProvinceFinanceInBytes;
+  const maxProvinceFinanceOffset = currentOffset;
+  currentOffset += maxProvinceFinanceInBytes;
+
+  // Align for Uint32Array (2 bytes)
+  if (currentOffset % 2 !== 0) currentOffset++;
+  const provinceFinanceStateInBytesPerElement = 4;
+  const provinceFinanceStateOffset = currentOffset;
+  currentOffset += provinceFinanceStateInBytesPerElement * provinceCount;
 
   return ({
     hexCountInBytes,
@@ -47,17 +76,7 @@ function calculateMapStateDimensions(playerCount, hexCount) {
     maxProvinceFinanceOffset,
     provinceFinanceStateInBytesPerElement,
     provinceFinanceStateOffset,
-    totalArraySize:
-      hexCountInBytes +
-      playerCountInBytes +
-      currentPlayerInBytes +
-      currentRoundInBytes +
-      provinceCountInBytes +
-      hexStateInBytesPerElement * hexCount +
-      hexOwnerInBytesPerElement * hexCount +
-      hexProvinceIdInBytesPerElement * hexCount +
-      maxProvinceFinanceInBytes +
-      provinceFinanceStateInBytesPerElement * provinceCount
+    totalArraySize: currentOffset
   });
 }
 
@@ -76,7 +95,7 @@ export class MapState extends Uint8Array {
 
     this.playerCount = playerCount;
     this.hexCount = hexCount;
-    this.calculatedEdgeMasks = new Array(hexCount);
+    this.calculatedEdgeMasks = new Float32Array(hexCount);
   }
 
   #hexCount;
@@ -158,11 +177,11 @@ export class MapState extends Uint8Array {
 
   #hexOwners;
   get hexOwners() {
-    return this.#hexOwners ??= new Uint8Array(this.buffer, this.dimensions.hexOwnerOffset, this.dimensions.hexOwnerInBytesPerElement * this.hexCount);
+    return this.#hexOwners ??= new Uint16Array(this.buffer, this.dimensions.hexOwnerOffset, this.hexCount);
   }
 
   set hexOwners(value) {
-    this.set(value, this.dimensions.hexOwnerOffset);
+    this.hexOwners.set(value);
   }
 
   getHexOwner(index) {
@@ -175,11 +194,11 @@ export class MapState extends Uint8Array {
 
   #hexProvinceIds;
   get hexProvinceIds() {
-    return this.#hexProvinceIds ??= new DataView(this.buffer, this.dimensions.hexProvinceIdOffset, this.dimensions.hexProvinceIdInBytesPerElement * this.hexCount);
+    return this.#hexProvinceIds ??= new Int32Array(this.buffer, this.dimensions.hexProvinceIdOffset, this.hexCount);
   }
 
   set hexProvinceIds(value) {
-    this.set(value, this.dimensions.hexProvinceIdOffset);
+    this.hexProvinceIds.set(value);
   }
 
   getHexProvinceId(index) {
@@ -203,11 +222,11 @@ export class MapState extends Uint8Array {
 
   #provinceFinanceStates;
   get provinceFinanceStates() {
-    return this.#provinceFinanceStates ??= new DataView(this.buffer, this.dimensions.provinceFinanceStateOffset, this.dimensions.provinceFinanceStateInBytesPerElement * this.provinceCount);
+    return this.#provinceFinanceStates ??= new Uint32Array(this.buffer, this.dimensions.provinceFinanceStateOffset, this.provinceCount);
   }
 
   set provinceFinanceStates(value) {
-    this.set(value, this.dimensions.provinceFinanceStateOffset);
+    this.provinceFinanceStates.set(value);
   }
 
   getProfinceFinanceState(index) {
@@ -226,16 +245,6 @@ export class MapState extends Uint8Array {
     for (let i = 0; i < hexCount; i++) {
       // If state is 0, owner 0 makes it invisible in shader
       masks[i] = (hexStates[i] !== 0) * hexOwners[i];
-    }
-    return masks;
-  }
-
-  get edgeMasksArray() {
-    const hexCount = this.hexCount;
-    const masks = new Float32Array(hexCount);
-    const calculatedEdgeMasks = this.calculatedEdgeMasks;
-    for (let i = 0; i < hexCount; i++) {
-      masks[i] = calculatedEdgeMasks[i] || 0;
     }
     return masks;
   }

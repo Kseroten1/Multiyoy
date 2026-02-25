@@ -16,6 +16,7 @@ uniform mat4 u_mvp;
 uniform int u_mapWidth;
 uniform int u_index;
 
+in float a_hexIndex;
 in float a_edgeMask;
 in float a_fillColorMask;
 
@@ -26,7 +27,7 @@ out vec2 v_local;
 
 void main() {
     float is_provided = step(0.0, float(u_index));
-    int idx = int(mix(float(gl_InstanceID), float(u_index), is_provided));
+    int idx = int(mix(float(gl_InstanceID), a_hexIndex, is_provided));
     int row = idx / u_mapWidth;
     int col = idx % u_mapWidth;
 
