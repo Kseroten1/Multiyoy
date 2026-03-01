@@ -14,12 +14,7 @@ const state = {
   renderRequestId: null,
 };
 
-export const CONFIG = {
-  defaultBorderWidth: 0.1,
-  playerCount: 378 //14*14*2 - 14 
-};
-
-const mapWidth = {
+const mapSideLength = {
   SMALL: 32,
   MEDIUM: 64,
   LARGE: 128,
@@ -29,8 +24,25 @@ const mapWidth = {
   LIFETIME: 2048
 };
 
-export const selectedMapWidth = mapWidth.LIFETIME;
-const totalHexCount = selectedMapWidth ** 2;
+const PLAYER_COUNTS = {
+  [mapSideLength.SMALL]: 4,
+  [mapSideLength.MEDIUM]: 16,
+  [mapSideLength.LARGE]: 32,
+  [mapSideLength.HUGE]: 64,
+  [mapSideLength.EXTRA]: 128,
+  [mapSideLength.YEAR10]: 256,
+  [mapSideLength.LIFETIME]: 378
+};
+
+export const selectedMapSideLength = mapSideLength.LIFETIME;
+const totalHexCount = selectedMapSideLength ** 2;
+
+export const CONFIG = {
+  defaultBorderWidth: 0.1,
+  playerCount: PLAYER_COUNTS[selectedMapSideLength],
+};
+
+
 
 /** @type {HTMLInputElement} */
 const bInput = document.getElementById("brightness");
@@ -73,7 +85,7 @@ const fillRgb = getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL)
 function updateSelectableUniforms (context, programLocations) {
   context.uniform3fv(programLocations.fillColors, new Float32Array(fillRgb));
   context.uniform1f(programLocations.borderWidth, CONFIG.defaultBorderWidth);
-  context.uniform1i(programLocations.mapWidth, selectedMapWidth);
+  context.uniform1i(programLocations.mapWidth, selectedMapSideLength);
 }
 
 updateSelectableUniforms(gl, mainHexProgramLocations);
@@ -86,7 +98,7 @@ gl.uniform3fv(mainHexProgramLocations.edgeColor, [0.0, 0.0, 0.0]);
 // setting edge color to white for highlight canvas
 gl2.uniform3fv(secondHexProgramLocations.edgeColor, [1.0, 1.0, 1.0]);
 
-const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
+const mapState = new MapState(CONFIG.playerCount, selectedMapSideLength ** 2);
 
 function createHexOwners(playerCount) {
   const owners = [];
@@ -107,16 +119,19 @@ function createHexOwners(playerCount) {
 }
 
 const possibleHexOwners = createHexOwners(CONFIG.playerCount);
-let j = 0;
-for (let i = 0; i < totalHexCount; i ++) {
-  mapState.setHexStateIndex(i, 1);
-  mapState.setHexOwner(i, 0);
-  // TODO: uniemożliwić losowanie koloru U**ainy
-  mapState.calculatedEdgeMasks[i] = 0b000000;
+const unassignedHexes = [];
+function mapInit() {
+  for (let i = 0; i < totalHexCount; i++) {
+    mapState.setHexStateIndex(i, 1);
+    mapState.setHexOwner(i, 0);
+    mapState.setHexProvinceId(i, -1);
+    // TODO: uniemożliwić losowanie koloru U**ainy
+    mapState.calculatedEdgeMasks[i] = 0b000000;
+    unassignedHexes[i] = i;
+  }
 }
-
+mapInit();
 const mainProvinceArray = [];
-const notEmptyIndexes = [];
 
 function addToIndex(index, hexId) {
   // If no array exists at this index yet, create it
@@ -131,30 +146,58 @@ function addToIndex(index, hexId) {
   mainProvinceArray[index].hexes.push(hexId);
 }
 
+const bufferIndex = initBuffer(gl,
+  mainHexProgramLocations.hexIndexAttrib,
+  unassignedHexes,
+  1,
+)
+
 function generateMap() {
-  const expansionProbability = 0.99;
-  let doneHexes = 0;
-  let currentHexOwner = 1;
-  let currentProvince = 0;
-  // while (doneHexes < hexStack.size() * Procent zaludnienia)
-  mapState.setHexOwner(doneHexes, possibleHexOwners[currentHexOwner]);
-  mapState.setHexProvinceId(doneHexes, currentProvince);
-  doneHexes++;
-  while (doneHexes < totalHexCount) {
-    if (Math.random() < expansionProbability) {
-      mapState.setHexOwner(doneHexes, possibleHexOwners[currentHexOwner]);
-      mapState.setHexProvinceId(doneHexes, currentProvince);
-      addToIndex(currentProvince, doneHexes);
-      notEmptyIndexes.push(doneHexes);
-      doneHexes++;
-    } else {
-      currentHexOwner++;
-      if (currentHexOwner >= 3) {currentHexOwner = 1;}
-      currentProvince++;
-      mapState.setHexOwner(doneHexes, 0);
-      mapState.setHexProvinceId(doneHexes, -1);
-      doneHexes++;
+  const hexesPerProvince = selectedMapSideLength/2;
+  const branchingChance = 0.5; 
+  let provinceId = 0;
+
+  while (unassignedHexes.length > 0) {
+    const randomIndex = Math.floor(Math.random() * unassignedHexes.length);
+    const startHex = unassignedHexes[randomIndex];
+    
+    unassignedHexes[randomIndex] = unassignedHexes[unassignedHexes.length - 1];
+    unassignedHexes.pop();
+
+    const playerIdx = (provinceId % (CONFIG.playerCount - 1)) + 1;
+    const ownerMask = possibleHexOwners[playerIdx];
+
+    if (mapState.getHexOwner(startHex) !== 0 || getHexNeighbors(startHex).some(n => mapState.getHexOwner(n) === ownerMask)) continue;
+
+    let history = [startHex];
+    let count = 0;
+
+    while (count < hexesPerProvince && history.length > 0) {
+      const current = history[history.length - 1];
+
+      if (mapState.getHexOwner(current) === 0) {
+        mapState.setHexOwner(current, ownerMask);
+        mapState.setHexProvinceId(current, provinceId);
+        addToIndex(provinceId, current);
+        count++;
+      }
+
+      const neighbors = getHexNeighbors(current).filter(n =>
+        mapState.getHexOwner(n) === 0 &&
+        !getHexNeighbors(n).some(nn => mapState.getHexOwner(nn) === ownerMask && mapState.getHexProvinceId(nn) !== provinceId)
+      );
+
+      if (neighbors.length > 0) {
+        const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+        history.push(next);
+        if (Math.random() > branchingChance) {
+          history.splice(history.length - 2, 1);
+        }
+      } else {
+        history.pop();
+      }
     }
+    provinceId++;
   }
 }
 
@@ -172,10 +215,10 @@ function precalculateProvinces() {
 
 function generateHexMaskFirst() {
   for (let i = 0; i < totalHexCount - 1; i++) {
-    const r = Math.floor(i / selectedMapWidth);
+    const r = Math.floor(i / selectedMapSideLength);
     const isRowOdd = (r & 1) !== 0;
-    const indexDownRight = i + selectedMapWidth + isRowOdd;
-    const indexDownLeft = i + selectedMapWidth + isRowOdd - 1;
+    const indexDownRight = i + selectedMapSideLength + isRowOdd;
+    const indexDownLeft = i + selectedMapSideLength + isRowOdd - 1;
 
     mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b000010;
     mapState.calculatedEdgeMasks[i + 1] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b010000;
@@ -231,12 +274,6 @@ const bufferEdge = initBuffer(
   1,
 );
 
-const bufferIndex = initBuffer(gl, 
-  mainHexProgramLocations.hexIndexAttrib, 
-  notEmptyIndexes,
-  1,
-  )
-
 const secondHexBufferFill = initBuffer(
   gl2,
   secondHexProgramLocations.fillColorMask,
@@ -285,7 +322,7 @@ function draw() {
   state.renderRequestId = null;
   const mvp = projectionMatrix.multiply(viewMatrix);
   gl.uniformMatrix4fv(mainHexProgramLocations.mvp, false, mvp.toFloat32Array());
-  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, notEmptyIndexes.length);
+  gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, totalHexCount);
   if (highlightHexCount > 0) {
     gl2.uniformMatrix4fv(secondHexProgramLocations.mvp, false, mvp.toFloat32Array());
     gl2.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, highlightHexCount);
