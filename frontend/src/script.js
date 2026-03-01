@@ -295,8 +295,6 @@ const secondHexIndexBuffer = initBuffer(
   1,
 )
 
-//mamy mapState -> ile zajmie odczytanie randomowej prowincji ze wszystkimi jej informacjami 
-
 onResize();
 scheduleRender();
 initEventHandlers();
