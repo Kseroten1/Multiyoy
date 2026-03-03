@@ -1,5 +1,4 @@
 import {ExtendedDataView} from "./ExtendedDataView.js";
-import {selectedMapSideLength} from "../script.js";
 import {encodeRowMajor} from "./rowMajor.js";
 
 function calculateMapStateDimensions(playerCount, hexCount) {
@@ -166,8 +165,8 @@ export class MapState extends Uint8Array {
     return this.hexStates[index];
   }
 
-  setHexState(q, r, value) {
-    let index = encodeRowMajor(q , r, selectedMapSideLength);
+  setHexState(q, r, value, sideLength) {
+    let index = encodeRowMajor(q , r, sideLength);
     this.setHexStateIndex(index, value);
   }
 
@@ -194,7 +193,7 @@ export class MapState extends Uint8Array {
 
   #hexProvinceIds;
   get hexProvinceIds() {
-    return this.#hexProvinceIds ??= new Int32Array(this.buffer, this.dimensions.hexProvinceIdOffset, this.hexCount);
+    return this.#hexProvinceIds ??= new Uint32Array(this.buffer, this.dimensions.hexProvinceIdOffset, this.hexCount);
   }
 
   set hexProvinceIds(value) {
