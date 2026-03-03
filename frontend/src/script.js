@@ -6,31 +6,22 @@ import {COLOR_TABLE_FILL} from './utils/config.js';
 import {buildWebGLProgram, getShaderLocations, initBuffer, modifyBuffer} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
-import {MapState} from "./utils/mapState.js";
 import {makeHexColorMask} from "./utils/math.js";
-import {getHexIndexFromMouseCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
+import {calculateHexMaskIndex, getHexIndexFromMouseCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
+import {setupMap} from "./utils/mapGenerator.js";
+
+const {
+  mapState,
+  CONFIG,
+  totalHexCount,
+  selectedMapSideLength,
+  mainProvinceArray,
+  mainIndexBufferData
+} = setupMap();
 
 const state = {
   renderRequestId: null,
 };
-
-export const CONFIG = {
-  defaultBorderWidth: 0.1,
-  playerCount: 1500
-};
-
-const mapWidth = {
-  SMALL: 32,
-  MEDIUM: 64,
-  LARGE: 128,
-  HUGE: 256,
-  EXTRA: 512,
-  YEAR10: 1024,
-  LIFETIME: 2048
-};
-
-export const selectedMapWidth = mapWidth.LIFETIME;
-const totalHexCount = selectedMapWidth ** 2;
 
 /** @type {HTMLInputElement} */
 const bInput = document.getElementById("brightness");
@@ -60,8 +51,6 @@ const viewMatrix = new DOMMatrix().scaleSelf(15);
  */
 let projectionMatrix = new DOMMatrix();
 
-
-
 const {program: mainHexProgram, vao: mainHexVao} = buildWebGLProgram(gl, vertexShaderString, fragmentShaderString);
 const {program: secondHexProgram, vao: secondHexVao } = buildWebGLProgram(gl2, vertexShaderString, fragmentShaderString);
 
@@ -73,7 +62,7 @@ const fillRgb = getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL)
 function updateSelectableUniforms (context, programLocations) {
   context.uniform3fv(programLocations.fillColors, new Float32Array(fillRgb));
   context.uniform1f(programLocations.borderWidth, CONFIG.defaultBorderWidth);
-  context.uniform1i(programLocations.mapWidth, selectedMapWidth);
+  context.uniform1i(programLocations.mapWidth, selectedMapSideLength);
 }
 
 updateSelectableUniforms(gl, mainHexProgramLocations);
@@ -86,60 +75,13 @@ gl.uniform3fv(mainHexProgramLocations.edgeColor, [0.0, 0.0, 0.0]);
 // setting edge color to white for highlight canvas
 gl2.uniform3fv(secondHexProgramLocations.edgeColor, [1.0, 1.0, 1.0]);
 
-const mapState = new MapState(CONFIG.playerCount, selectedMapWidth ** 2);
-
-for (let i = 0; i < totalHexCount; i ++) {
-  mapState.setHexStateIndex(i, 1);
-  mapState.setHexOwner(i, Math.random() > 0.5 ? makeHexColorMask(2, 2, false) : makeHexColorMask(4, 4, false));
-  // TODO: uniemożliwić losowanie koloru U**ainy
-  mapState.calculatedEdgeMasks[i] = 0b000000;
-}
-
-function generateHexMaskFirst() {
-  for (let i = 0; i < totalHexCount - 1; i++) {
-    const r = Math.floor(i / selectedMapWidth);
-    const isRowOdd = (r & 1) !== 0;
-    const indexDownRight = i + selectedMapWidth + isRowOdd;
-    const indexDownLeft = i + selectedMapWidth + isRowOdd - 1;
-
-    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b000010;
-    mapState.calculatedEdgeMasks[i + 1] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b010000;
-
-    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownRight]);
-    mapState.calculatedEdgeMasks[indexDownRight] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownRight]) * 0b001000;
-
-    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b100000;
-    mapState.calculatedEdgeMasks[indexDownLeft] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b000100;
-  }
-}
-
-function calculateHexMaskIndex(indices) {
-  const neighborMasks = [
-    0b000010, // East
-    0b010000, // West
-    0b000001, // LowerRight
-    0b100000, // LowerLeft
-    0b000100, // UpperRight
-    0b001000  // UpperLeft
-  ];
-
-  for (const currentIndex of indices) {
-    const neighbors = getHexNeighbors(currentIndex);
-    const currentOwner = mapState.hexOwners[currentIndex];
-    let mask = 0;
-
-    for (const neighborId of neighbors) {
-      const i = neighbors.indexOf(neighborId);
-      if (currentOwner !== mapState.hexOwners[neighborId]) {mask |= neighborMasks[i];}
-    }
-
-    mapState.calculatedEdgeMasks[currentIndex] = mask;
-  }
-}
-
-generateHexMaskFirst();
-
 const emptyData = new Float32Array(totalHexCount);
+
+const bufferIndex = initBuffer(gl,
+  mainHexProgramLocations.hexIndexAttrib,
+  mainIndexBufferData,
+  1,
+)
 
 const bufferFill = initBuffer(
   gl,
@@ -151,7 +93,7 @@ const bufferFill = initBuffer(
 const bufferEdge = initBuffer(
   gl,
   mainHexProgramLocations.edgeMask,
-  mapState.edgeMasksArray,
+  mapState.calculatedEdgeMasks,
   1,
 );
 
@@ -169,18 +111,32 @@ const secondHexBufferEdge = initBuffer(
   1,
 );
 
+const secondHexIndexBuffer = initBuffer(
+  gl2, 
+  secondHexProgramLocations.hexIndexAttrib, 
+  emptyData,
+  1,
+)
+
 onResize();
 scheduleRender();
 initEventHandlers();
 
-
+let currentlyHighlighted = -1;
+let highlightHexCount = 0;
 function highlightHex(mouseX, mouseY) {
-  const hexIndex = getHexIndexFromMouseCoords(mouseX, mouseY, viewMatrix);
-  const highlightOwner = mapState.hexOwners[hexIndex];
+  const hexIndex = getHexIndexFromMouseCoords(mouseX, mouseY, viewMatrix, selectedMapSideLength);
+  const provinceId = mapState.getHexProvinceId(hexIndex);
+  if (provinceId === -1 || currentlyHighlighted === provinceId) {return;}
+  const province = mainProvinceArray[provinceId];
+  highlightHexCount = province.hexes.length;
+  
   gl2.uniform1i(secondHexProgramLocations.hexIndex, hexIndex);
+  modifyBuffer(gl2, secondHexIndexBuffer, 0, province.indices);
   gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.5, sInput.value * 1.5, COLOR_TABLE_FILL))
-  modifyBuffer(gl2, secondHexBufferFill, 0, [highlightOwner]);
-  modifyBuffer(gl2, secondHexBufferEdge, 0, [mapState.edgeMasksArray[hexIndex]]);
+  modifyBuffer(gl2, secondHexBufferFill, 0, province.owners);
+  modifyBuffer(gl2, secondHexBufferEdge, 0, province.edgeMasks);
+  currentlyHighlighted = provinceId;
 }
 
 function draw() {
@@ -188,8 +144,10 @@ function draw() {
   const mvp = projectionMatrix.multiply(viewMatrix);
   gl.uniformMatrix4fv(mainHexProgramLocations.mvp, false, mvp.toFloat32Array());
   gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, totalHexCount);
-  gl2.uniformMatrix4fv(secondHexProgramLocations.mvp, false, mvp.toFloat32Array());
-  gl2.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, 1);
+  if (highlightHexCount > 0) {
+    gl2.uniformMatrix4fv(secondHexProgramLocations.mvp, false, mvp.toFloat32Array());
+    gl2.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 8, highlightHexCount);
+  }
 }
 
 function scheduleRender() {
@@ -243,14 +201,14 @@ function initEventHandlers() {
   highlightCanvas.addEventListener("pointerdown", (e) => {
     if (dragging) return;
 
-    const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix);
+    const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix, selectedMapSideLength);
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
     mapState.setHexOwner(hexIndex, newMask);
     modifyBuffer(gl, bufferFill, hexIndex, [newMask]);
     
-    const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex)];
-    calculateHexMaskIndex(hexToUpdate);
+    const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex, selectedMapSideLength)];
+    calculateHexMaskIndex(hexToUpdate, mapState, selectedMapSideLength);
 
     for (const hexToUpdateIndex of hexToUpdate) {
       modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
@@ -301,7 +259,3 @@ function initEventHandlers() {
   sInput.addEventListener("input", onInputChange);
 
 }
-
-// for (let i = 0; i < 1000; i++) {
-//
-// }
