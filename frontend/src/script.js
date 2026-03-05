@@ -17,7 +17,11 @@ const {
   totalHexCount,
   selectedMapSideLength,
   mainProvinceArray,
-  mainIndexBufferData
+  mainIndexBufferData,
+  generateMap,
+  generateHexMaskFirst,
+  precalculateProvinces,
+  logPlayerStats
 } = setupMap();
 
 const state = {
@@ -45,7 +49,7 @@ const gl2 = highlightCanvas.getContext("webgl2", {colorSpace: "display-p3"});
  * Used for controls related calculations (camera origin, zoom, pan)
  * @type {DOMMatrix}
  */
-const viewMatrix = new DOMMatrix().scaleSelf(15);
+const viewMatrix = new DOMMatrix().scaleSelf(0.5);
 /**
  * Used for window related calculations (window size, device pixel ratio)
  * @type {DOMMatrix}
@@ -122,6 +126,54 @@ const secondHexIndexBuffer = initBuffer(
 onResize();
 scheduleRender();
 initEventHandlers();
+animateMapGeneration();
+
+async function animateMapGeneration() {
+  const generator = generateMap();
+  const batchSize = 1000; 
+  let provincesGenerated = 0;
+
+  function step() {
+    let result;
+    for (let i = 0; i < batchSize; i++) {
+      result = generator.next();
+      if (result.done) break;
+      provincesGenerated++;
+    }
+
+    if (provincesGenerated % (batchSize * 5) === 0 || result.done) {
+        modifyBuffer(gl, bufferFill, 0, mapState.fillMasksArray);
+        scheduleRender();
+    }
+
+    if (!result.done) {
+      requestAnimationFrame(step);
+    } else {
+      const maskGenerator = generateHexMaskFirst();
+      const maskBatchSize = 100000;
+      function maskStep() {
+        let maskResult;
+        for (let i = 0; i < maskBatchSize; i += 10000) {
+           maskResult = maskGenerator.next();
+           if (maskResult.done) break;
+        }
+
+        if (!maskResult.done) {
+          requestAnimationFrame(maskStep);
+        } else {
+          precalculateProvinces();
+          logPlayerStats();
+          modifyBuffer(gl, bufferFill, 0, mapState.fillMasksArray);
+          modifyBuffer(gl, bufferEdge, 0, mapState.calculatedEdgeMasks);
+          scheduleRender();
+        }
+      }
+      maskStep();
+    }
+  }
+  
+  step();
+}
 
 let currentlyHighlighted = UNASSIGNED_PROVINCE_ID;
 let highlightHexCount = 0;

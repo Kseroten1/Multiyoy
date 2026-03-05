@@ -23,7 +23,7 @@ const PLAYER_COUNTS = {
   [mapSideLength.LIFETIME]: 378
 };
 
-const selectedMapSideLength = mapSideLength.LIFETIME;
+const selectedMapSideLength = mapSideLength.EXTRA;
 const totalHexCount = selectedMapSideLength ** 2;
 
 const CONFIG = {
@@ -80,22 +80,45 @@ function mapInit() {
   }
 }
 
-function generateMap() {
-  const hexesPerProvince = selectedMapSideLength/2;
+function* generateMap() {
+  const hexesPerProvince = Math.max(1, Math.floor(selectedMapSideLength / 2)); // Even smaller provinces for finer control
   const branchingChance = 0.5;
   let provinceId = 0;
+  let skippedHexes = 0;
+
+  const hexCountsPerPlayer = new Int32Array(CONFIG.playerCount);
 
   while (unassignedHexes.length > 0) {
+    let playerIdx = -1;
+    let minHexCount = Infinity;
+    
+    const startOffset = Math.floor(Math.random() * (CONFIG.playerCount - 1)) + 1;
+    for (let i = 0; i < CONFIG.playerCount - 1; i++) {
+      const pId = ((startOffset + i - 1) % (CONFIG.playerCount - 1)) + 1;
+      if (hexCountsPerPlayer[pId] < minHexCount) {
+        minHexCount = hexCountsPerPlayer[pId];
+        playerIdx = pId;
+      }
+    }
+
+    const ownerMask = possibleHexOwners[playerIdx];
+
     const randomIndex = Math.floor(Math.random() * unassignedHexes.length);
     const startHex = unassignedHexes[randomIndex];
 
     unassignedHexes[randomIndex] = unassignedHexes[unassignedHexes.length - 1];
     unassignedHexes.pop();
 
-    const playerIdx = (provinceId % (CONFIG.playerCount - 1)) + 1;
-    const ownerMask = possibleHexOwners[playerIdx];
-
-    if (mapState.getHexOwner(startHex) !== 0 || getHexNeighbors(startHex, selectedMapSideLength).some(n => mapState.getHexOwner(n) === ownerMask)) continue;
+    if (mapState.getHexOwner(startHex) !== 0 || getHexNeighbors(startHex, selectedMapSideLength).some(n => mapState.getHexOwner(n) === ownerMask)) {
+      skippedHexes++;
+      if (skippedHexes >= 50000) {
+        skippedHexes = 0;
+        yield provinceId;
+      }
+      continue;
+    }
+    
+    skippedHexes = 0;
 
     let history = [startHex];
     let count = 0;
@@ -107,6 +130,7 @@ function generateMap() {
         mapState.setHexOwner(current, ownerMask);
         mapState.setHexProvinceId(current, provinceId);
         addToIndex(provinceId, current);
+        hexCountsPerPlayer[playerIdx]++;
         count++;
       }
 
@@ -125,7 +149,9 @@ function generateMap() {
         history.pop();
       }
     }
+
     provinceId++;
+    yield provinceId;
   }
 }
 
@@ -139,7 +165,8 @@ function precalculateProvinces() {
   }
 }
 
-function generateHexMaskFirst() {
+function* generateHexMaskFirst() {
+  const batchSize = 100000;
   for (let i = 0; i < totalHexCount - 1; i++) {
     const r = Math.floor(i / selectedMapSideLength);
     const isRowOdd = (r & 1) !== 0;
@@ -154,22 +181,25 @@ function generateHexMaskFirst() {
 
     mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b100000;
     mapState.calculatedEdgeMasks[indexDownLeft] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b000100;
+
+    if (i % batchSize === 0) {
+      yield i;
+    }
   }
 }
 
 
 export function setupMap() {
   mapInit();
-  generateMap();
-  generateHexMaskFirst();
-  precalculateProvinces();
-
   return {
     mapState: mapState,
     CONFIG: CONFIG,
     totalHexCount: totalHexCount,
     selectedMapSideLength: selectedMapSideLength,
     mainProvinceArray: mainProvinceArray,
-    mainIndexBufferData: new Float32Array(totalHexCount).map((_, i) => i)
+    mainIndexBufferData: new Float32Array(totalHexCount).map((_, i) => i),
+    generateMap: generateMap,
+    generateHexMaskFirst: generateHexMaskFirst,
+    precalculateProvinces: precalculateProvinces,
   };
 }
