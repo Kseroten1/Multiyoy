@@ -1,5 +1,5 @@
 import {getHexNeighbors} from "./hexLogicHelper.js";
-import {COLOR_TABLE_FILL} from "./config.js";
+import {COLOR_TABLE_FILL, UNASSIGNED_PROVINCE_ID} from "./config.js";
 import {makeHexColorMask} from "./math.js";
 import {MapState} from "./mapState.js";
 
@@ -73,7 +73,7 @@ function mapInit() {
   for (let i = 0; i < totalHexCount; i++) {
     mapState.setHexStateIndex(i, 1);
     mapState.setHexOwner(i, 0);
-    mapState.setHexProvinceId(i, -1);
+    mapState.setHexProvinceId(i, UNASSIGNED_PROVINCE_ID);
     // TODO: uniemożliwić losowanie koloru U**ainy
     mapState.calculatedEdgeMasks[i] = 0b000000;
     unassignedHexes[i] = i;

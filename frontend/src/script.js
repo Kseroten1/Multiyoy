@@ -2,13 +2,14 @@
 import vertexShaderString from './shaders/vertexShader.glsl?raw';
 /** @type {string} */
 import fragmentShaderString from './shaders/fragmentShader.glsl?raw';
-import {COLOR_TABLE_FILL} from './utils/config.js';
+import {COLOR_TABLE_FILL, UNASSIGNED_PROVINCE_ID, INVALID_HEX_INDEX} from './utils/config.js';
 import {buildWebGLProgram, getShaderLocations, initBuffer, modifyBuffer} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {makeHexColorMask} from "./utils/math.js";
 import {calculateHexMaskIndex, getHexIndexFromMouseCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
 import {setupMap} from "./utils/mapGenerator.js";
+import {handleProvinceRecalculation} from "./utils/provinceLogic.js";
 
 const {
   mapState,
@@ -69,7 +70,7 @@ updateSelectableUniforms(gl, mainHexProgramLocations);
 updateSelectableUniforms(gl2, secondHexProgramLocations);
 
 // this ensures shader uses its instanceID as index for main canvas
-gl.uniform1i(mainHexProgramLocations.hexIndex, -1);
+gl.uniform1i(mainHexProgramLocations.hexIndex, INVALID_HEX_INDEX);
 // setting edge color to black for main canvas
 gl.uniform3fv(mainHexProgramLocations.edgeColor, [0.0, 0.0, 0.0]);
 // setting edge color to white for highlight canvas
@@ -122,12 +123,12 @@ onResize();
 scheduleRender();
 initEventHandlers();
 
-let currentlyHighlighted = -1;
+let currentlyHighlighted = UNASSIGNED_PROVINCE_ID;
 let highlightHexCount = 0;
 function highlightHex(mouseX, mouseY) {
   const hexIndex = getHexIndexFromMouseCoords(mouseX, mouseY, viewMatrix, selectedMapSideLength);
   const provinceId = mapState.getHexProvinceId(hexIndex);
-  if (provinceId === -1 || currentlyHighlighted === provinceId) {return;}
+  if (provinceId === UNASSIGNED_PROVINCE_ID || currentlyHighlighted === provinceId) {return;}
   const province = mainProvinceArray[provinceId];
   highlightHexCount = province.hexes.length;
   
@@ -202,6 +203,7 @@ function initEventHandlers() {
     if (dragging) return;
 
     const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix, selectedMapSideLength);
+    //const provinceId = mapState.getHexProvinceId(hexIndex);
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
     mapState.setHexOwner(hexIndex, newMask);
@@ -213,6 +215,10 @@ function initEventHandlers() {
     for (const hexToUpdateIndex of hexToUpdate) {
       modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
+
+    handleProvinceRecalculation(hexIndex, mainProvinceArray, mapState, selectedMapSideLength);
+    
+    currentlyHighlighted = UNASSIGNED_PROVINCE_ID; 
     highlightHex(e.clientX, e.clientY);
     
     scheduleRender();

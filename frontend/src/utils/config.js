@@ -1,4 +1,7 @@
 
+export const UNASSIGNED_PROVINCE_ID = -1;
+export const INVALID_HEX_INDEX = -1;
+
 export const COLOR_TABLE_FILL = [
     [0.2575, 0.072, 254.83], [0.5398, 0.183, 254.16], [0.7804, 0.099, 228.76],
     [0.7138, 0.069, 199.93], [0.5092, 0.226, 315.1], [0.6683, 0.228, 320.18],

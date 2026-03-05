@@ -1,4 +1,5 @@
 import {screenToWorld} from "./math.js";
+import {INVALID_HEX_INDEX} from "./config.js";
 
 export function getHexNeighbors(index, sideLength) {
   const r = Math.floor(index / sideLength);
@@ -41,7 +42,7 @@ export function getHexIndexFromMouseCoords(mouseX, mouseY, matrix, sideLength) {
   const col = Math.round((worldX - rowOffset) / sqrt3);
 
   // Zabezpieczenie przed wyjściem poza zakres
-  if (col < 0 || col >= sideLength || row < 0 || row >= sideLength) return -1;
+  if (col < 0 || col >= sideLength || row < 0 || row >= sideLength) return INVALID_HEX_INDEX;
   return row * sideLength + col;
 }
 
