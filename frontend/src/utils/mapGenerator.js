@@ -23,7 +23,7 @@ const PLAYER_COUNTS = {
   [mapSideLength.LIFETIME]: 378
 };
 
-const selectedMapSideLength = mapSideLength.EXTRA;
+const selectedMapSideLength = mapSideLength.LIFETIME;
 const totalHexCount = selectedMapSideLength ** 2;
 
 const CONFIG = {
@@ -81,7 +81,7 @@ function mapInit() {
 }
 
 function* generateMap() {
-  const hexesPerProvince = Math.max(1, Math.floor(selectedMapSideLength / 2)); // Even smaller provinces for finer control
+  const hexesPerProvince = Math.max(1, Math.floor(selectedMapSideLength / 2));
   const branchingChance = 0.5;
   let provinceId = 0;
   let skippedHexes = 0;

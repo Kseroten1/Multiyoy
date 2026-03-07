@@ -17,8 +17,13 @@ function createMockEnvironment() {
   return { mapState, mainProvinceArray: [] };
 }
 
+
+/**
+ * @param env { mapState, mainProvinceArray }
+ * @param hexes {{ id: number, owner: number, provinceId: number }[]}
+ */
 function setupHexes(env, hexes) {
-  hexes.forEach(({ id, owner, provinceId }) => {
+  for (const { id, owner, provinceId } of hexes) {
     env.mapState.owners[id] = owner;
     env.mapState.provinceIds[id] = provinceId;
     if (provinceId !== UNASSIGNED_PROVINCE_ID) {
@@ -27,7 +32,7 @@ function setupHexes(env, hexes) {
       }
       env.mainProvinceArray[provinceId].hexes.push(id);
     }
-  });
+  }
 }
 
 describe("Province Logic (Direct Data Assertions)", () => {
@@ -55,9 +60,7 @@ describe("Province Logic (Direct Data Assertions)", () => {
     expect(masterProvince.hexes).toContain(46);
 
     const otherProvinceId = finalProvinceId === 0 ? 1 : 0;
-    if(env.mainProvinceArray[otherProvinceId]) {
-      expect(env.mainProvinceArray[otherProvinceId].hexes.length).toBe(0);
-    }
+    expect(env.mainProvinceArray[otherProvinceId].hexes.length).toBe(0);
   });
 
   test("Split: Breaking a 3-hex line into two separate provinces", () => {

@@ -21,7 +21,6 @@ const {
   generateMap,
   generateHexMaskFirst,
   precalculateProvinces,
-  logPlayerStats
 } = setupMap();
 
 const state = {
@@ -49,7 +48,7 @@ const gl2 = highlightCanvas.getContext("webgl2", {colorSpace: "display-p3"});
  * Used for controls related calculations (camera origin, zoom, pan)
  * @type {DOMMatrix}
  */
-const viewMatrix = new DOMMatrix().scaleSelf(0.5);
+const viewMatrix = new DOMMatrix().scaleSelf(0.8);
 /**
  * Used for window related calculations (window size, device pixel ratio)
  * @type {DOMMatrix}
@@ -128,51 +127,34 @@ scheduleRender();
 initEventHandlers();
 animateMapGeneration();
 
-async function animateMapGeneration() {
-  const generator = generateMap();
-  const batchSize = 1000; 
-  let provincesGenerated = 0;
-
-  function step() {
-    let result;
-    for (let i = 0; i < batchSize; i++) {
-      result = generator.next();
-      if (result.done) break;
-      provincesGenerated++;
-    }
-
-    if (provincesGenerated % (batchSize * 5) === 0 || result.done) {
-        modifyBuffer(gl, bufferFill, 0, mapState.fillMasksArray);
-        scheduleRender();
-    }
-
-    if (!result.done) {
-      requestAnimationFrame(step);
-    } else {
-      const maskGenerator = generateHexMaskFirst();
-      const maskBatchSize = 100000;
-      function maskStep() {
-        let maskResult;
-        for (let i = 0; i < maskBatchSize; i += 10000) {
-           maskResult = maskGenerator.next();
-           if (maskResult.done) break;
-        }
-
-        if (!maskResult.done) {
-          requestAnimationFrame(maskStep);
-        } else {
-          precalculateProvinces();
-          logPlayerStats();
-          modifyBuffer(gl, bufferFill, 0, mapState.fillMasksArray);
-          modifyBuffer(gl, bufferEdge, 0, mapState.calculatedEdgeMasks);
-          scheduleRender();
-        }
-      }
-      maskStep();
+async function processInBatches(generator, batchSize, onUpdate) {
+  let count = 0;
+  for (const _ of generator) {
+    count++;
+    if (count % batchSize === 0) {
+      if (onUpdate) onUpdate(count);
+      await new Promise(requestAnimationFrame);
     }
   }
-  
-  step();
+  if (onUpdate) onUpdate(count);
+}
+
+async function animateMapGeneration() {
+  const updateFillBuffer = () => {
+    modifyBuffer(gl, bufferFill, 0, mapState.fillMasksArray);
+    scheduleRender();
+  };
+  const batchSize = Math.ceil(selectedMapSideLength/10);
+  await processInBatches(generateMap(), batchSize, (count) => {
+    if (count % batchSize === 0) updateFillBuffer();
+  });
+
+  await processInBatches(generateHexMaskFirst(), batchSize);
+
+  precalculateProvinces();
+  updateFillBuffer();
+  modifyBuffer(gl, bufferEdge, 0, mapState.calculatedEdgeMasks);
+  scheduleRender();
 }
 
 let currentlyHighlighted = UNASSIGNED_PROVINCE_ID;
@@ -255,7 +237,6 @@ function initEventHandlers() {
     if (dragging) return;
 
     const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix, selectedMapSideLength);
-    //const provinceId = mapState.getHexProvinceId(hexIndex);
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
     mapState.setHexOwner(hexIndex, newMask);
