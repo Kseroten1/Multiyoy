@@ -249,7 +249,14 @@ function initEventHandlers() {
       modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
 
-    handleProvinceRecalculation(hexIndex, mainProvinceArray, mapState, selectedMapSideLength);
+    handleProvinceRecalculation(
+      hexIndex,                         
+      mainProvinceArray,           
+      mapState.hexProvinceIds,      
+      mapState.hexOwners,           
+      mapState.calculatedEdgeMasks,
+      selectedMapSideLength
+    );
     
     currentlyHighlighted = UNASSIGNED_PROVINCE_ID; 
     highlightHex(e.clientX, e.clientY);

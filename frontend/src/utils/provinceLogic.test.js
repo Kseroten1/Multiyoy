@@ -1,102 +1,122 @@
-import { expect, test, describe } from "bun:test";
-import { handleProvinceRecalculation, syncProvinceCache } from "./provinceLogic.js";
-import { UNASSIGNED_PROVINCE_ID } from "./config.js";
+import {expect, test, describe} from "bun:test";
+import {handleProvinceRecalculation, syncProvinceCache} from "./provinceLogic.js";
+import {UNASSIGNED_PROVINCE_ID} from "./config.js";
 
 const MAP_SIDE = 10;
 const MAX_HEXES = 100;
 
-function createMockEnvironment() {
-  const mapState = {
-    owners: new Float32Array(MAX_HEXES).fill(0),
-    provinceIds: new Int32Array(MAX_HEXES).fill(UNASSIGNED_PROVINCE_ID),
-    calculatedEdgeMasks: new Float32Array(MAX_HEXES).fill(0),
-    getHexOwner: (id) => mapState.owners[id],
-    getHexProvinceId: (id) => mapState.provinceIds[id],
-    setHexProvinceId: (hexId, provinceId) => { mapState.provinceIds[hexId] = provinceId; },
+function setupTest() {
+  return {
+    mainProvinceArray: [],
+    hexProvinceIds: new Int32Array(MAX_HEXES).fill(UNASSIGNED_PROVINCE_ID),
+    hexOwners: new Float32Array(MAX_HEXES),
+    hexEdgeMasks: new Float32Array(MAX_HEXES),
   };
-  return { mapState, mainProvinceArray: [] };
-}
-
-
-/**
- * @param env { mapState, mainProvinceArray }
- * @param hexes {{ id: number, owner: number, provinceId: number }[]}
- */
-function setupHexes(env, hexes) {
-  for (const { id, owner, provinceId } of hexes) {
-    env.mapState.owners[id] = owner;
-    env.mapState.provinceIds[id] = provinceId;
-    if (provinceId !== UNASSIGNED_PROVINCE_ID) {
-      if (!env.mainProvinceArray[provinceId]) {
-        env.mainProvinceArray[provinceId] = { hexes: [] };
-      }
-      env.mainProvinceArray[provinceId].hexes.push(id);
-    }
-  }
 }
 
 describe("Province Logic (Direct Data Assertions)", () => {
 
   test("Merge: Hex 45 should join Province 0 and consume Province 1", () => {
-    const env = createMockEnvironment();
+    const {mainProvinceArray, hexProvinceIds, hexOwners, hexEdgeMasks} = setupTest();
+    const ownerId = 1;
+    hexProvinceIds[44] = 0;
+    hexOwners[44] = ownerId;
+    mainProvinceArray[0] = {hexes: [44]};
 
-    setupHexes(env, [
-      { id: 44, owner: 1, provinceId: 0 },
-      { id: 46, owner: 1, provinceId: 1 }
-    ]);
+    hexProvinceIds[46] = 1;
+    hexOwners[46] = ownerId;
+    mainProvinceArray[1] = {hexes: [46]};
 
-    syncProvinceCache(0, env.mainProvinceArray, env.mapState);
-    syncProvinceCache(1, env.mainProvinceArray, env.mapState);
+    syncProvinceCache(0, mainProvinceArray, hexOwners, hexEdgeMasks);
+    syncProvinceCache(1, mainProvinceArray, hexOwners, hexEdgeMasks);
 
-    env.mapState.owners[45] = 1;
-    handleProvinceRecalculation(45, env.mainProvinceArray, env.mapState, MAP_SIDE);
+    hexOwners[45] = ownerId;
 
-    const finalProvinceId = env.mapState.getHexProvinceId(44);
-    const masterProvince = env.mainProvinceArray[finalProvinceId];
+    handleProvinceRecalculation(
+      45,
+      mainProvinceArray,
+      hexProvinceIds,
+      hexOwners,
+      hexEdgeMasks,
+      MAP_SIDE,
+    );
+
+    const finalProvinceId = hexProvinceIds[45];
 
     expect(finalProvinceId).not.toBe(UNASSIGNED_PROVINCE_ID);
+
+    const masterProvince = mainProvinceArray[finalProvinceId];
     expect(masterProvince.hexes).toContain(44);
     expect(masterProvince.hexes).toContain(45);
     expect(masterProvince.hexes).toContain(46);
 
     const otherProvinceId = finalProvinceId === 0 ? 1 : 0;
-    expect(env.mainProvinceArray[otherProvinceId].hexes.length).toBe(0);
+    const otherProvince = mainProvinceArray[otherProvinceId];
+
+    expect(otherProvince.hexes.length).toBe(0);
+    expect(otherProvince.owners).toBeNull();
+    expect(otherProvince.indices).toBeNull();
   });
 
   test("Split: Breaking a 3-hex line into two separate provinces", () => {
-    const env = createMockEnvironment();
+    const {mainProvinceArray, hexProvinceIds, hexOwners, hexEdgeMasks} = setupTest();
+    const initialOwner = 1;
+    const hexes = [44, 45, 46];
+    mainProvinceArray[0] = {hexes: [...hexes]};
 
-    setupHexes(env, [
-      { id: 44, owner: 1, provinceId: 0 },
-      { id: 45, owner: 1, provinceId: 0 },
-      { id: 46, owner: 1, provinceId: 0 }
-    ]);
+    for (const id of hexes) {
+      hexProvinceIds[id] = 0;
+      hexOwners[id] = initialOwner;
+    }
 
-    env.mapState.owners[45] = 2;
-    handleProvinceRecalculation(45, env.mainProvinceArray, env.mapState, MAP_SIDE);
+    hexOwners[45] = 2;
 
-    const activeProvinces = env.mainProvinceArray.filter(p => p?.hexes?.length > 0);
+    handleProvinceRecalculation(
+      45,
+      mainProvinceArray,
+      hexProvinceIds,
+      hexOwners,
+      hexEdgeMasks,
+      MAP_SIDE,
+    );
+
+    const activeProvinces = mainProvinceArray.filter((province) => province.hexes.length);
     expect(activeProvinces.length).toBe(3);
 
-    const provinceId45 = env.mapState.getHexProvinceId(45);
-    expect(env.mapState.getHexOwner(45)).toBe(2);
-    expect(env.mainProvinceArray[provinceId45].hexes).toEqual([45]);
+    const provinceId44 = hexProvinceIds[44];
+    const provinceId45 = hexProvinceIds[45];
+    const provinceId46 = hexProvinceIds[46];
 
-    const provinceId44 = env.mapState.getHexProvinceId(44);
-    const provinceId46 = env.mapState.getHexProvinceId(46);
+    expect(provinceId44).not.toBe(provinceId45);
+    expect(provinceId46).not.toBe(provinceId45);
     expect(provinceId44).not.toBe(provinceId46);
+
+    expect(hexOwners[45]).toBe(2);
   });
 
   test("Sync: Cache arrays should be populated after recalculation", () => {
-    const env = createMockEnvironment();
+    const {mainProvinceArray, hexProvinceIds, hexOwners, hexEdgeMasks} = setupTest();
 
-    env.mapState.owners[50] = 7;
-    handleProvinceRecalculation(50, env.mainProvinceArray, env.mapState, MAP_SIDE);
+    const targetHex = 50;
+    const targetOwner = 7;
+    hexOwners[targetHex] = targetOwner;
 
-    const provinceId = env.mapState.getHexProvinceId(50);
-    const province = env.mainProvinceArray[provinceId];
+    handleProvinceRecalculation(
+      targetHex,
+      mainProvinceArray,
+      hexProvinceIds,
+      hexOwners,
+      hexEdgeMasks,
+      MAP_SIDE,
+    );
 
-    expect(province.owners[0]).toBe(7);
-    expect(province.indices[0]).toBe(50);
+    const provinceId = hexProvinceIds[targetHex];
+    const province = mainProvinceArray[provinceId];
+
+    expect(province.owners).toBeInstanceOf(Float32Array);
+    expect(province.indices).toBeInstanceOf(Float32Array);
+
+    expect(province.owners[0]).toBe(targetOwner);
+    expect(province.indices[0]).toBe(targetHex);
   });
 });
