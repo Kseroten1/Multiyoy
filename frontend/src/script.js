@@ -8,8 +8,7 @@ import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {makeHexColorMask} from "./utils/math.js";
 import {calculateHexMaskIndex, getHexIndexFromMouseCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
-import {setupMap} from "./utils/mapGenerator.js";
-import {handleProvinceRecalculation} from "./utils/provinceLogic.js";
+import {setupMap, generateMap, generateHexMaskFirst} from "./utils/mapGenerator.js";
 
 const {
   mapState,
@@ -17,10 +16,6 @@ const {
   totalHexCount,
   selectedMapSideLength,
   mainProvinceArray,
-  mainIndexBufferData,
-  generateMap,
-  generateHexMaskFirst,
-  precalculateProvinces,
 } = setupMap();
 
 const state = {
@@ -81,12 +76,6 @@ gl2.uniform3fv(secondHexProgramLocations.edgeColor, [1.0, 1.0, 1.0]);
 
 const emptyData = new Float32Array(totalHexCount);
 
-const bufferIndex = initBuffer(gl,
-  mainHexProgramLocations.hexIndexAttrib,
-  mainIndexBufferData,
-  1,
-)
-
 const bufferFill = initBuffer(
   gl,
   mainHexProgramLocations.fillColorMask,
@@ -127,16 +116,23 @@ scheduleRender();
 initEventHandlers();
 animateMapGeneration();
 
+
+/**
+ * 
+ * @param generator {Iterable<number>}
+ * @param batchSize {number}
+ * @param onUpdate { () => void }
+ */
 async function processInBatches(generator, batchSize, onUpdate) {
   let count = 0;
   for (const _ of generator) {
     count++;
     if (count % batchSize === 0) {
-      if (onUpdate) onUpdate(count);
+      onUpdate?.();
       await new Promise(requestAnimationFrame);
     }
   }
-  if (onUpdate) onUpdate(count);
+  onUpdate?.();
 }
 
 async function animateMapGeneration() {
@@ -144,14 +140,10 @@ async function animateMapGeneration() {
     modifyBuffer(gl, bufferFill, 0, mapState.fillMasksArray);
     scheduleRender();
   };
-  const batchSize = Math.ceil(selectedMapSideLength/10);
-  await processInBatches(generateMap(), batchSize, (count) => {
-    if (count % batchSize === 0) updateFillBuffer();
-  });
+  const batchSize = Math.ceil(selectedMapSideLength) * 5;
+  await processInBatches(generateMap(), batchSize, () => {updateFillBuffer();});
 
-  await processInBatches(generateHexMaskFirst(), batchSize);
-
-  precalculateProvinces();
+  generateHexMaskFirst();
   updateFillBuffer();
   modifyBuffer(gl, bufferEdge, 0, mapState.calculatedEdgeMasks);
   scheduleRender();
@@ -163,14 +155,16 @@ function highlightHex(mouseX, mouseY) {
   const hexIndex = getHexIndexFromMouseCoords(mouseX, mouseY, viewMatrix, selectedMapSideLength);
   const provinceId = mapState.getHexProvinceId(hexIndex);
   if (provinceId === UNASSIGNED_PROVINCE_ID || currentlyHighlighted === provinceId) {return;}
-  const province = mainProvinceArray[provinceId];
-  highlightHexCount = province.hexes.length;
+  
+  const renderData = mapState.getProvinceRenderData(provinceId, mainProvinceArray);
+  
+  highlightHexCount = renderData.count;
   
   gl2.uniform1i(secondHexProgramLocations.hexIndex, hexIndex);
-  modifyBuffer(gl2, secondHexIndexBuffer, 0, province.indices);
+  modifyBuffer(gl2, secondHexIndexBuffer, 0, renderData.indices.subarray(0, highlightHexCount));
   gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.5, sInput.value * 1.5, COLOR_TABLE_FILL))
-  modifyBuffer(gl2, secondHexBufferFill, 0, province.owners);
-  modifyBuffer(gl2, secondHexBufferEdge, 0, province.edgeMasks);
+  modifyBuffer(gl2, secondHexBufferFill, 0, renderData.owners.subarray(0, highlightHexCount));
+  modifyBuffer(gl2, secondHexBufferEdge, 0, renderData.edgeMasks.subarray(0, highlightHexCount));
   currentlyHighlighted = provinceId;
 }
 
@@ -238,7 +232,7 @@ function initEventHandlers() {
 
     const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix, selectedMapSideLength);
     
-    const newMask = makeHexColorMask(Math.floor(Math.random() * 13), Math.floor(Math.random() * 13), false);
+    const newMask = makeHexColorMask(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), Math.floor(Math.random() * 2));
     mapState.setHexOwner(hexIndex, newMask);
     modifyBuffer(gl, bufferFill, hexIndex, [newMask]);
     
@@ -249,14 +243,7 @@ function initEventHandlers() {
       modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
 
-    handleProvinceRecalculation(
-      hexIndex,                         
-      mainProvinceArray,           
-      mapState.hexProvinceIds,      
-      mapState.hexOwners,           
-      mapState.calculatedEdgeMasks,
-      selectedMapSideLength
-    );
+    mapState.recalculateProvince(hexIndex, mainProvinceArray);
     
     currentlyHighlighted = UNASSIGNED_PROVINCE_ID; 
     highlightHex(e.clientX, e.clientY);

@@ -11,5 +11,8 @@
   "devDependencies": {
     "vite": "^7.1.4",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "mitata": "^1.0.34"
   }
 }
