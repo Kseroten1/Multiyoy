@@ -1,6 +1,6 @@
 
 export const UNASSIGNED_PROVINCE_ID = -1;
-export const INVALID_HEX_INDEX = -1;
+export const INVALID_HEX_INDEX = -1; // jak zmienie na 0 to bede mogl sie pozbyc tego zjebanego 
 
 export const COLOR_TABLE_FILL = [
     [0.2575, 0.072, 254.83], [0.5398, 0.183, 254.16], [0.7804, 0.099, 228.76],

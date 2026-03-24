@@ -39,9 +39,7 @@ const unassignedHexes = [];
 
 function addToIndex(index, hexId) {
   // If no array exists at this index yet, create it
-  if (!mainProvinceArray[index]) {
-    mainProvinceArray[index] = [];
-  }
+  mainProvinceArray[index] ??= [];
   mainProvinceArray[index].push(hexId);
 }
 
@@ -104,17 +102,6 @@ export function* generateMap() {
 
     unassignedHexes[randomIndex] = unassignedHexes[unassignedHexes.length - 1];
     unassignedHexes.pop();
-
-    const isHexOwned = mapState.getHexOwner(startHex) !== 0;
-
-    if (isHexOwned || mapState.anyNeighborSharesOwner(startHex, ownerMask)) {
-      skippedHexes++;
-      if (skippedHexes >= 50000) {
-        skippedHexes = 0;
-        yield provinceId;
-      }
-      continue;
-    }
 
     skippedHexes = 0;
 
