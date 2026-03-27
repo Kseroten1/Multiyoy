@@ -1,4 +1,3 @@
-import {ExtendedDataView} from "./ExtendedDataView.js";
 import {encodeRowMajor} from "./rowMajor.js";
 import {UNASSIGNED_PROVINCE_ID} from "./config.js";
 import {getHexNeighbors} from "./hexLogicHelper.js";
@@ -86,7 +85,7 @@ function calculateMapStateDimensions(hexCount) {
 }
 
 export class MapState extends Uint8Array {
-  dataView = new ExtendedDataView(this.buffer)
+  dataView = new DataView(this.buffer)
   /** @typedef {Set<number>[]} ProvinceHexIdsByProvinceId */
   /** @type {ProvinceHexIdsByProvinceId} */
   provinceHexIdsByProvinceId = []
@@ -111,57 +110,58 @@ export class MapState extends Uint8Array {
 
   #hexCount;
   get hexCount() {
-    this.#hexCount ??= this.dataView.getNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes);
+    this.#hexCount ??= (this.dataView.getUint8(this.dimensions.hexCountOffset) << 16) | this.dataView.getUint16(this.dimensions.hexCountOffset + 1);
     return this.#hexCount;
   }
 
   set hexCount(number) {
     this.#hexCount = number;
-    this.dataView.setNumber(this.dimensions.hexCountOffset, this.dimensions.hexCountInBytes, number);
+    this.dataView.setUint8(this.dimensions.hexCountOffset, (number >> 16) & 0xff);
+    this.dataView.setUint16(this.dimensions.hexCountOffset + 1, number & 0xffff);
   }
 
   #playerCount;
   get playerCount() {
-    this.#playerCount ??= this.dataView.getNumber(this.dimensions.playerCountOffset, this.dimensions.playerCountInBytes);
+    this.#playerCount ??= this.dataView.getUint16(this.dimensions.playerCountOffset);
     return this.#playerCount;
   }
 
   set playerCount(value) {
     this.#playerCount = value;
-    this.dataView.setNumber(this.dimensions.playerCountOffset, this.dimensions.playerCountInBytes, value);
+    this.dataView.setUint16(this.dimensions.playerCountOffset, value);
   }
 
   #currentPlayer;
   get currentPlayer() {
-    this.#currentPlayer ??= this.dataView.getNumber(this.dimensions.currentPlayerOffset, this.dimensions.currentPlayerInBytes);
+    this.#currentPlayer ??= this.dataView.getUint16(this.dimensions.currentPlayerOffset);
     return this.#currentPlayer;
   }
 
   set currentPlayer(value) {
     this.#currentPlayer = value;
-    this.dataView.setNumber(this.dimensions.currentPlayerOffset, this.dimensions.currentPlayerInBytes, value);
+    this.dataView.setUint16(this.dimensions.currentPlayerOffset, value);
   }
 
   #currentRound;
   get currentRound() {
-    this.#currentRound ??= this.dataView.getNumber(this.dimensions.currentRoundOffset, this.dimensions.currentRoundInBytes);
+    this.#currentRound ??= this.dataView.getUint32(this.dimensions.currentRoundOffset);
     return this.#currentRound;
   }
 
   set currentRound(value) {
     this.#currentRound = value;
-    this.dataView.setNumber(this.dimensions.currentRoundOffset, this.dimensions.currentRoundInBytes, value);
+    this.dataView.setUint32(this.dimensions.currentRoundOffset, value);
   }
 
   #provinceCount;
   get provinceCount() {
-    this.#provinceCount ??= this.dataView.getNumber(this.dimensions.provinceCountOffset, this.dimensions.provinceCountInBytes);
+    this.#provinceCount ??= this.dataView.getUint32(this.dimensions.provinceCountOffset);
     return this.#provinceCount;
   }
 
   set provinceCount(value) {
     this.#provinceCount = value;
-    this.dataView.setNumber(this.dimensions.provinceCountOffset, this.dimensions.provinceCountInBytes, value);
+    this.dataView.setUint32(this.dimensions.provinceCountOffset, value);
   }
 
   #hexStates;
@@ -201,7 +201,6 @@ export class MapState extends Uint8Array {
   /**
    * @param index {number}
    * @param value {number}
-   * @param provinces {Set<number>[] || null} 
    * @returns number[]
    */
   setHexOwner(index, value) {
@@ -244,13 +243,13 @@ export class MapState extends Uint8Array {
 
   #maxProvinceFinance;
   get maxProvinceFinance() {
-    this.#maxProvinceFinance ??= this.dataView.getNumber(this.dimensions.maxProvinceFinanceOffset, this.dimensions.maxProvinceFinanceInBytes);
+    this.#maxProvinceFinance ??= this.dataView.getUint32(this.dimensions.maxProvinceFinanceOffset);
     return this.#maxProvinceFinance;
   }
 
   set maxProvinceFinance(value) {
     this.#maxProvinceFinance = value;
-    this.dataView.setNumber(this.dimensions.maxProvinceFinanceOffset, this.dimensions.maxProvinceFinanceInBytes, value);
+    this.dataView.setUint32(this.dimensions.maxProvinceFinanceOffset, value);
   }
 
   #provinceFinanceStates;
