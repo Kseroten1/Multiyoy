@@ -1,51 +1,46 @@
-/** @type {string} */
 import vertexShaderString from './shaders/vertexShader.glsl?raw';
-/** @type {string} */
 import fragmentShaderString from './shaders/fragmentShader.glsl?raw';
-import {COLOR_TABLE_FILL, UNASSIGNED_PROVINCE_ID, INVALID_HEX_INDEX} from './utils/config.js';
+import {COLOR_TABLE_FILL, UNASSIGNED_PROVINCE_ID, INVALID_HEX_INDEX, PLAYER_COUNTS, MAP_SIDE_LENGTH} from './utils/config.js';
 import {buildWebGLProgram, getShaderLocations, initBuffer, modifyBuffer} from "./utils/glUtils.js";
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {makeHexColorMask} from "./utils/math.js";
 import {getHexIndexFromMouseCoords} from "./utils/hexLogicHelper.js";
-import {createMap, populateProvinces} from "./utils/mapGenerator.js";
+import {MapState} from "./utils/mapState.js";
 
-const {
-  generatedMap,
-  config,
-  provinceHexIdsByProvinceId,
-} = createMap();
+const selectedMapSideLength = MAP_SIDE_LENGTH.LIFETIME;
 
-const state = {
-  renderRequestId: null,
+const config = {
+  defaultBorderWidth: 0.1,
+  mapSideLength: selectedMapSideLength,
+  totalHexCount: selectedMapSideLength ** 2,
+  playerCount: PLAYER_COUNTS[selectedMapSideLength],
 };
 
-/** @type {HTMLInputElement} */
-const bInput = document.getElementById("brightness");
-/** @type {HTMLInputElement} */
-const sInput = document.getElementById("saturation");
+const mapState = new MapState(config.playerCount, config.totalHexCount);
 
+const state = {
+  renderRequestId: /** @type {number | null} */ (null),
+};
+
+const bInput = /** @type {HTMLInputElement} */ (document.getElementById("brightness"));
+const sInput = /** @type {HTMLInputElement} */ (document.getElementById("saturation"));
+
+// TODO: `updateBrightnessAndSaturationMax` can be done once and only at compile time
 const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
 bInput.max = maxB;
 sInput.max = maxS;
 
-const mainCanvas = document.getElementById("main");
-const highlightCanvas = document.getElementById("secondary");
-/** @type {WebGL2RenderingContext} */
-const gl = mainCanvas.getContext("webgl2", {colorSpace: "display-p3"});
+const mainCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById("main"));
+const highlightCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById("secondary"));
+const canvasOptions = /** @type {WebGLContextAttributes} */ {colorSpace: "display-p3"};
 
-/** @type {WebGL2RenderingContext} */
-const gl2 = highlightCanvas.getContext("webgl2", {colorSpace: "display-p3"});
+const gl = /** @type {WebGL2RenderingContext} */ (mainCanvas.getContext("webgl2", canvasOptions));
+const gl2 = /** @type {WebGL2RenderingContext} */ (highlightCanvas.getContext("webgl2", canvasOptions));
 
-/**
- * Used for controls related calculations (camera origin, zoom, pan)
- * @type {DOMMatrix}
- */
+// Used for controls related calculations (camera origin, zoom, pan)
 const viewMatrix = new DOMMatrix().scaleSelf(0.8);
-/**
- * Used for window related calculations (window size, device pixel ratio)
- * @type {DOMMatrix}
- */
+// Used for window related calculations (window size, device pixel ratio)
 let projectionMatrix = new DOMMatrix();
 
 const {program: mainHexProgram, vao: mainHexVao} = buildWebGLProgram(gl, vertexShaderString, fragmentShaderString);
@@ -56,10 +51,14 @@ const secondHexProgramLocations = getShaderLocations(gl2, secondHexProgram);
 
 const fillRgb = getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL);
 
-function updateSelectableUniforms (context, programLocations) {
-  context.uniform3fv(programLocations.fillColors, new Float32Array(fillRgb));
-  context.uniform1f(programLocations.borderWidth, config.defaultBorderWidth);
-  context.uniform1i(programLocations.mapWidth, config.mapSideLength);
+/**
+ * @param {WebGL2RenderingContext} context
+ * @param {{ borderWidth: WebGLUniformLocation; mapWidth: WebGLUniformLocation; fillColors: WebGLUniformLocation; }} uniformLocations
+ */
+function updateSelectableUniforms(context, uniformLocations) {
+  context.uniform3fv(uniformLocations.fillColors, new Float32Array(fillRgb));
+  context.uniform1f(uniformLocations.borderWidth, config.defaultBorderWidth);
+  context.uniform1i(uniformLocations.mapWidth, config.mapSideLength);
 }
 
 updateSelectableUniforms(gl, mainHexProgramLocations);
@@ -77,14 +76,14 @@ const emptyData = new Float32Array(config.totalHexCount);
 const bufferFill = initBuffer(
   gl,
   mainHexProgramLocations.fillColorMask,
-  generatedMap.fillMasksArray,
+  mapState.fillMasksArray,
   1,
 );
 
 const bufferEdge = initBuffer(
   gl,
   mainHexProgramLocations.edgeMask,
-  generatedMap.calculatedEdgeMasks,
+  mapState.calculatedEdgeMasks,
   1,
 );
 
@@ -112,7 +111,7 @@ const secondHexIndexBuffer = initBuffer(
 onResize();
 scheduleRender();
 initEventHandlers();
-animateMapGeneration();
+void animateMapGeneration();
 
 
 /**
@@ -136,35 +135,38 @@ async function processInBatches(generator, batchSize, onUpdate) {
 async function animateMapGeneration() {
   const batchSize = Math.ceil(config.mapSideLength) * 5;
   await processInBatches(
-    populateProvinces(),
+    mapState.generateSlayLikeMap(),
     batchSize,
     () => {
-      modifyBuffer(gl, bufferFill, 0, generatedMap.fillMasksArray);
+      modifyBuffer(gl, bufferFill, 0, mapState.fillMasksArray);
       scheduleRender();
     },
   );
 
-  generatedMap.generateHexMaskFirst();
-  modifyBuffer(gl, bufferEdge, 0, generatedMap.calculatedEdgeMasks);
+  modifyBuffer(gl, bufferEdge, 0, mapState.calculatedEdgeMasks);
   scheduleRender();
 }
 
 let currentlyHighlighted = UNASSIGNED_PROVINCE_ID;
 let highlightHexCount = 0;
 
+/**
+ * @param {number} mouseX
+ * @param {number} mouseY
+ */
 function highlightHex(mouseX, mouseY) {
   const hexIndex = getHexIndexFromMouseCoords(mouseX, mouseY, viewMatrix, config.mapSideLength);
   if (hexIndex === INVALID_HEX_INDEX) return;
-  const provinceId = generatedMap.getHexProvinceId(hexIndex);
+  const provinceId = mapState.getHexProvinceId(hexIndex);
   if (provinceId === UNASSIGNED_PROVINCE_ID || currentlyHighlighted === provinceId) {return;}
   
-  const renderData = generatedMap.getProvinceRenderData(provinceId, provinceHexIdsByProvinceId[provinceId]);
+  const renderData = mapState.getProvinceRenderData(provinceId);
   
   highlightHexCount = renderData.count;
   
   gl2.uniform1i(secondHexProgramLocations.hexIndex, hexIndex);
   modifyBuffer(gl2, secondHexIndexBuffer, 0, renderData.indices);
-  gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.5, sInput.value * 1.5, COLOR_TABLE_FILL))
+  gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(+bInput.value * 1.5, +sInput.value * 1.5, COLOR_TABLE_FILL))
   modifyBuffer(gl2, secondHexBufferFill, 0, renderData.owners);
   modifyBuffer(gl2, secondHexBufferEdge, 0, renderData.edgeMasks);
   currentlyHighlighted = provinceId;
@@ -235,12 +237,12 @@ function initEventHandlers() {
     const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix, config.mapSideLength);
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), Math.floor(Math.random() * 2));
-    const updatedHexIndices = generatedMap.setHexOwner(hexIndex, newMask, provinceHexIdsByProvinceId);
+    const updatedHexIndices = mapState.setHexOwner(hexIndex, newMask);
     
     modifyBuffer(gl, bufferFill, hexIndex, [newMask]);
     
     for (const hexToUpdateIndex of updatedHexIndices) {
-      modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [generatedMap.calculatedEdgeMasks[hexToUpdateIndex]]);
+      modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
     
     currentlyHighlighted = UNASSIGNED_PROVINCE_ID; 
@@ -268,7 +270,7 @@ function initEventHandlers() {
     scheduleRender();
   });
 
-  const endDrag = (e) => {
+  const endDrag = (/** @type {{ pointerId: number; }} */ e) => {
     if (!dragging) { return; }
     dragging = false;
 
@@ -281,8 +283,8 @@ function initEventHandlers() {
   window.addEventListener("resize", onResize);
 
   function onInputChange() {
-    gl.uniform3fv(mainHexProgramLocations.fillColors, getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL));
-    gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(bInput.value * 1.2, sInput.value * 1.2, COLOR_TABLE_FILL));
+    gl.uniform3fv(mainHexProgramLocations.fillColors, getScaledRgbColors(+bInput.value, +sInput.value, COLOR_TABLE_FILL));
+    gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(+bInput.value * 1.2, +sInput.value * 1.2, COLOR_TABLE_FILL));
     scheduleRender();
   }
 
