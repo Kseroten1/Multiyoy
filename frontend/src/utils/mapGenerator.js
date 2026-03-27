@@ -1,5 +1,4 @@
-import {getHexNeighbors} from "./hexLogicHelper.js";
-import {COLOR_TABLE_FILL, UNASSIGNED_PROVINCE_ID} from "./config.js";
+import {COLOR_TABLE_FILL} from "./config.js";
 import {makeHexColorMask} from "./math.js";
 import {MapState} from "./mapState.js";
 
@@ -24,23 +23,25 @@ const PLAYER_COUNTS = {
 };
 
 const selectedMapSideLength = mapSideLength.LIFETIME;
-const totalHexCount = selectedMapSideLength ** 2;
 
-const CONFIG = {
+const config = {
   defaultBorderWidth: 0.1,
+  mapSideLength: selectedMapSideLength,
+  totalHexCount: selectedMapSideLength ** 2,
   playerCount: PLAYER_COUNTS[selectedMapSideLength],
+  
 };
 
-const mapState = new MapState(CONFIG.playerCount, selectedMapSideLength ** 2);
+const mapState = new MapState(config.playerCount, selectedMapSideLength ** 2);
 
-/** @type {number[][]} */
+/** @type {Set<number>[]} */
 const mainProvinceArray = [];
 const unassignedHexes = [];
 
 function addToIndex(index, hexId) {
-  // If no array exists at this index yet, create it
-  mainProvinceArray[index] ??= [];
-  mainProvinceArray[index].push(hexId);
+  // If no Set exists at this index yet, create it
+  mainProvinceArray[index] ??= new Set();
+  mainProvinceArray[index].add(hexId);
 }
 
 function createHexOwners(playerCount) {
@@ -61,41 +62,41 @@ function createHexOwners(playerCount) {
   return owners;
 }
 
-const possibleHexOwners = createHexOwners(CONFIG.playerCount);
+const possibleHexOwners = createHexOwners(config.playerCount);
 
 function mapInit() {
   mainProvinceArray.length = 0;
-  unassignedHexes.length = 0;
 
-  for (let i = 0; i < totalHexCount; i++) {
-    mapState.setHexStateIndex(i, 1);
-    mapState.setHexOwner(i, 0);
-    mapState.setHexProvinceId(i, UNASSIGNED_PROVINCE_ID);
-    mapState.calculatedEdgeMasks[i] = 0b000000;
+  mapState.hexStates.fill(1);
+  for (let i = 0; i < config.totalHexCount; i++) {
     unassignedHexes[i] = i;
   }
 }
 
-export function* generateMap() {
+
+/**
+ * @returns {Generator<number>} Yields the current provinceId after each province is fully populated.
+ */
+export function* populateProvinces() {
   const hexesPerProvince = Math.max(1, Math.floor(selectedMapSideLength / 2));
   const branchingChance = 0.5;
-  let provinceId = 0;
+  let provinceId = 1;
   let skippedHexes = 0;
 
-  const hexCountsPerPlayer = new Int32Array(CONFIG.playerCount);
+  const hexCountsPerPlayer = new Int32Array(config.playerCount);
 
   while (unassignedHexes.length > 0) {
     let playerIdx = -1;
     let minHexCount = Infinity;
 
-    for (let pId = 1; pId < CONFIG.playerCount; pId++) {
+    for (let pId = 0; pId < config.playerCount; pId++) {
       if (hexCountsPerPlayer[pId] < minHexCount) {
         minHexCount = hexCountsPerPlayer[pId];
         playerIdx = pId;
       }
     }
 
-    const ownerMask = possibleHexOwners[playerIdx];
+    const currentOwnerMask = possibleHexOwners[playerIdx];
 
     const randomIndex = Math.floor(Math.random() * unassignedHexes.length);
     const startHex = unassignedHexes[randomIndex];
@@ -112,28 +113,25 @@ export function* generateMap() {
       const current = history[history.length - 1];
 
       if (mapState.getHexOwner(current) === 0) {
-        mapState.setHexOwner(current, ownerMask);
+        mapState.setHexOwner(current, currentOwnerMask);
         mapState.setHexProvinceId(current, provinceId);
         addToIndex(provinceId, current);
         hexCountsPerPlayer[playerIdx]++;
         count++;
       }
 
-      const neighbors = getHexNeighbors(
-        current,
-        selectedMapSideLength
-      ).filter(
-        (n) =>
-          mapState.getHexOwner(n) === 0 &&
-          !getHexNeighbors(n, selectedMapSideLength).some(
-            (nn) =>
-              mapState.getHexOwner(nn) === ownerMask &&
-              mapState.getHexProvinceId(nn) !== provinceId
-          )
-      );
+      const neighbors = mapState.getUnownedHexNeighbors(current);
+      let validNeighborCount = 0;
+      for (let i = 0; i < neighbors.length; i++) {
+        const n = neighbors[i];
+        //if hexes do not collude
+        if (!mapState.checkHexCollusion(n)) {
+          neighbors[validNeighborCount++] = n;
+        }
+      }
 
-      if (neighbors.length > 0) {
-        const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+      if (validNeighborCount > 0) {
+        const next = neighbors[Math.floor(Math.random() * validNeighborCount)];
         history.push(next);
         if (Math.random() > branchingChance) {
           history.splice(history.length - 2, 1);
@@ -143,48 +141,30 @@ export function* generateMap() {
       }
     }
 
-    provinceId++;
     yield provinceId;
+    provinceId++;
   }
 }
 
-export function generateHexMaskFirst() {
-  for (let i = 0; i < totalHexCount - 1; i++) {
-    const r = Math.floor(i / selectedMapSideLength);
-    const isRowOdd = (r & 1) !== 0;
-    const indexDownRight = i + selectedMapSideLength + isRowOdd;
-    const indexDownLeft = i + selectedMapSideLength + isRowOdd - 1;
-
-    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b000010;
-    mapState.calculatedEdgeMasks[i + 1] |= (mapState.hexOwners[i] !== mapState.hexOwners[i + 1]) * 0b010000;
-
-    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownRight]);
-    mapState.calculatedEdgeMasks[indexDownRight] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownRight]) * 0b001000;
-
-    mapState.calculatedEdgeMasks[i] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b100000;
-    mapState.calculatedEdgeMasks[indexDownLeft] |= (mapState.hexOwners[i] !== mapState.hexOwners[indexDownLeft]) * 0b000100;
-    }
-  }
-
 /**
  * @returns {{
- *   mapState: MapState,
- *   CONFIG: {
+ *   generatedMap: MapState,
+ *   config: {
  *     defaultBorderWidth: number,
- *     playerCount: number
+ *     mapSideLength: number,
+ *     totalHexCount: number,
+ *     playerCount: number,
  *   },
  *   totalHexCount: number,
- *   selectedMapSideLength: number,
- *   mainProvinceArray: number[][],
+ *   mapSideLength: number,
+ *   provinceHexIdsByProvinceId: Set<number>[],
  * }}
  */
-export function setupMap() {
+export function createMap() {
   mapInit();
   return {
-    mapState: mapState,
-    CONFIG: CONFIG,
-    totalHexCount: totalHexCount,
-    selectedMapSideLength: selectedMapSideLength,
-    mainProvinceArray: mainProvinceArray,
+    generatedMap: mapState,
+    config: config,
+    provinceHexIdsByProvinceId: mainProvinceArray,
   };
 }

@@ -90,10 +90,6 @@ export class MapState extends Uint8Array {
 
   sideLength;
 
-  provinceRenderIndices = new Float32Array(0);
-  provinceRenderOwners = new Float32Array(0);
-  provinceRenderEdgeMasks = new Float32Array(0);
-
   constructor(playerCount, hexCount) {
     const dimensions = calculateMapStateDimensions(playerCount, hexCount);
 
@@ -250,6 +246,7 @@ export class MapState extends Uint8Array {
     const masks = new Float32Array(hexCount);
     const hexStates = this.hexStates;
     const hexOwners = this.hexOwners;
+    // If state is 0, owner 0 makes it invisible in shader
     for (let i = 0; i < hexCount; i++) {
       masks[i] = (hexStates[i] !== 0) * hexOwners[i];
     }
@@ -257,32 +254,63 @@ export class MapState extends Uint8Array {
   }
 
   /**
-   * 
-   * @param index {number}
-   * @param ownerMask {number}
-   * @returns {boolean}
+   * @param ownerIndex {number}
+   * @returns {number[]}
    */
-  anyNeighborSharesOwner(index, ownerMask) {
+  getUnownedHexNeighbors(ownerIndex) {
     const sideLength = this.sideLength;
     const hexOwners = this.hexOwners;
+    const row = Math.floor(ownerIndex / sideLength);
+    const colOffset = row & 1;
+    const column = ownerIndex % sideLength;
+    const rowBelow = ownerIndex + sideLength;
+    const rowAbove = ownerIndex - sideLength;
+    const neighbors = [];
 
-    const r = Math.floor(index / sideLength);
-    const isRowOdd = (r & 1) !== 0;
-    const c = index % sideLength;
+    if (hexOwners[ownerIndex + 1] === 0 && column + 1 < sideLength) { neighbors.push(ownerIndex + 1); }
+    if (hexOwners[ownerIndex - 1] === 0 && column - 1 >= 0) { neighbors.push(ownerIndex - 1); }
 
-    if (ownerMask === hexOwners[index + 1] && c + 1 < sideLength) return true;
-    if (ownerMask === hexOwners[index - 1] && c - 1 >= 0) return true;
-
-    if (r + 1 < sideLength) {
-      const rowBelow = index + sideLength;
-      if (ownerMask === hexOwners[rowBelow + isRowOdd] && c + isRowOdd < sideLength) return true;
-      if (ownerMask === hexOwners[rowBelow + isRowOdd - 1] && c + isRowOdd - 1 >= 0) return true;
+    if (row + 1 < sideLength) {
+      if (hexOwners[rowBelow + colOffset] === 0 && column + colOffset < sideLength) { neighbors.push(rowBelow + colOffset); }
+      if (hexOwners[rowBelow + colOffset - 1] === 0 && column + colOffset - 1 >= 0) { neighbors.push(rowBelow + colOffset - 1); }
     }
 
-    if (r - 1 >= 0) {
-      const rowAbove = index - sideLength;
-      if (ownerMask === hexOwners[rowAbove + isRowOdd] && c + isRowOdd < sideLength) return true;
-      if (ownerMask === hexOwners[rowAbove + isRowOdd - 1] && c + isRowOdd - 1 >= 0) return true;
+    if (row - 1 >= 0) {
+      if (hexOwners[rowAbove + colOffset] === 0 && column + colOffset < sideLength) { neighbors.push(rowAbove + colOffset); }
+      if (hexOwners[rowAbove + colOffset - 1] === 0 && column + colOffset - 1 >= 0) { neighbors.push(rowAbove + colOffset - 1); }
+    }
+
+    return neighbors;
+  }
+
+  /**
+   * @param ownerIndex {number}
+   * @returns {boolean}
+   */
+  checkHexCollusion(ownerIndex) {
+    const sideLength = this.sideLength;
+    const hexOwners = this.hexOwners;
+    const hexProvinceIds = this.hexProvinceIds;
+    const ownerMask = hexOwners[ownerIndex];
+    const provinceId = hexProvinceIds[ownerIndex];
+
+    const row = Math.floor(ownerIndex / sideLength);
+    const colOffset = row & 1;
+    const column = ownerIndex % sideLength;
+
+    if (hexOwners[ownerIndex + 1] === ownerMask && hexProvinceIds[ownerIndex + 1] !== provinceId && column + 1 < sideLength) { return true; }
+    if (hexOwners[ownerIndex - 1] === ownerMask && hexProvinceIds[ownerIndex - 1] !== provinceId && column - 1 >= 0) { return true; }
+
+    if (row + 1 < sideLength) {
+      const rowBelow = ownerIndex + sideLength;
+      if (hexOwners[rowBelow + colOffset] === ownerMask && hexProvinceIds[rowBelow + colOffset] !== provinceId && column + colOffset < sideLength) { return true; }
+      if (hexOwners[rowBelow + colOffset - 1] === ownerMask && hexProvinceIds[rowBelow + colOffset - 1] !== provinceId && column + colOffset - 1 >= 0) { return true; }
+    }
+
+    if (row - 1 >= 0) {
+      const rowAbove = ownerIndex - sideLength;
+      if (hexOwners[rowAbove + colOffset] === ownerMask && hexProvinceIds[rowAbove + colOffset] !== provinceId && column + colOffset < sideLength) { return true; }
+      if (hexOwners[rowAbove + colOffset - 1] === ownerMask && hexProvinceIds[rowAbove + colOffset - 1] !== provinceId && column + colOffset - 1 >= 0) { return true; }
     }
 
     return false;
@@ -290,61 +318,59 @@ export class MapState extends Uint8Array {
 
   /**
    *
-   * @param index  {number}
-   * @param provinceId {number}
+   * @param ownerIndex  {number}
    * @returns {number}
    */
-  countNeighborsInProvince(index, provinceId) {
+  countNeighborsInProvince(ownerIndex) {
+    const hexProvinceIds = this.hexProvinceIds;
+    const provinceId = hexProvinceIds[ownerIndex];
     const sideLength = this.sideLength;
-    const r = Math.floor(index / sideLength);
-    const isRowOdd = (r & 1) !== 0 ? 1 : 0;
-    const c = index % sideLength;
+    const row = Math.floor(ownerIndex / sideLength);
+    const colOffset = (row & 1);
+    const column = ownerIndex % sideLength;
     let count = 0;
 
-    if (this.getHexProvinceId(index + 1) === provinceId && c + 1 < sideLength) count++;
-    if (this.getHexProvinceId(index - 1) === provinceId && c - 1 >= 0) count++;
+    if (hexProvinceIds[ownerIndex + 1] === provinceId && column + 1 < sideLength) count++;
+    if (hexProvinceIds[ownerIndex - 1] === provinceId && column - 1 >= 0) count++;
 
-    if (r + 1 < sideLength) {
-      const rowBelow = index + sideLength;
-      if (this.getHexProvinceId(rowBelow + (isRowOdd ? 1 : 0)) === provinceId && c + isRowOdd < sideLength) count++;
-      if (this.getHexProvinceId(rowBelow + (isRowOdd ? 0 : -1)) === provinceId && c + (isRowOdd ? 0 : -1) >= 0) count++;
+    if (row + 1 < sideLength) {
+      const rowBelow = ownerIndex + sideLength;
+      if (hexProvinceIds[rowBelow + colOffset] === provinceId && column + colOffset < sideLength) count++;
+      if (hexProvinceIds[rowBelow + colOffset - 1] === provinceId && column + colOffset - 1 >= 0) count++;
     }
 
-    if (r - 1 >= 0) {
-      const rowAbove = index - sideLength;
-      if (this.getHexProvinceId(rowAbove + (isRowOdd ? 1 : 0)) === provinceId && c + (isRowOdd ? 1 : 0) < sideLength) count++;
-      if (this.getHexProvinceId(rowAbove + (isRowOdd ? 0 : -1)) === provinceId && c + (isRowOdd ? 0 : -1) >= 0 ) count++;
+    if (row - 1 >= 0) {
+      const rowAbove = ownerIndex - sideLength;
+      if (hexProvinceIds[rowAbove + colOffset] === provinceId && column + colOffset < sideLength) count++;
+      if (hexProvinceIds[rowAbove + colOffset - 1] === provinceId && column + colOffset - 1 >= 0 ) count++;
     }
 
     return count;
   }
 
-  ensureProvinceRenderCapacity(size) {
-    if (this.provinceRenderIndices.length >= size) return;
+  /**
+   * @param provinceId {number}
+   * @param provinceHexes {Set<number>}
+   * @returns {{count: number, indices: Float32Array, owners: Float32Array, edgeMasks: Float32Array}}
+   */
 
-    this.provinceRenderIndices = new Float32Array(size);
-    this.provinceRenderOwners = new Float32Array(size);
-    this.provinceRenderEdgeMasks = new Float32Array(size);
-  }
+  getProvinceRenderData(provinceId, provinceHexes) {
+    const count = provinceHexes?.size ?? 0;
 
-  getProvinceRenderData(provinceId, provinces) {
-    const provinceHexes = provinces[provinceId];
-    const size = provinceHexes?.length ?? 0;
-
-    this.ensureProvinceRenderCapacity(size);
+    const indices = new Float32Array(count);
+    const owners = new Float32Array(count);
+    const edgeMasks = new Float32Array(count);
     
-    const indices = this.provinceRenderIndices;
-    const owners = this.provinceRenderOwners;
-    const edgeMasks = this.provinceRenderEdgeMasks;
-
-    for (let i = 0; i < size; i++) {
-      indices[i] = provinceHexes[i];
-      owners[i] = this.hexOwners[provinceHexes[i]];
-      edgeMasks[i] = this.calculatedEdgeMasks[provinceHexes[i]];
+    let i = 0;
+    for (const hexIdx of provinceHexes) {
+      indices[i] = hexIdx;
+      owners[i] = this.hexOwners[hexIdx];
+      edgeMasks[i] = this.calculatedEdgeMasks[hexIdx];
+      i++;
     }
 
     return {
-      count: size,
+      count: count,
       indices,
       owners,
       edgeMasks,
@@ -354,61 +380,61 @@ export class MapState extends Uint8Array {
   /**
    * 
    * @param hexIndex {number}
-   * @param provinces {[][]}
+   * @param provinces {Set<number>[]}
    */
   removeFromProvince(hexIndex, provinces) {
-    const provinceId = this.getHexProvinceId(hexIndex);
-    if (provinceId === UNASSIGNED_PROVINCE_ID) return;
+    const provinceId = this.hexProvinceIds[hexIndex];
 
     const province = provinces[provinceId];
-    const hexPos = province.indexOf(hexIndex);
-    if (hexPos === -1) return;
+    if (!province || !province.has(hexIndex)) return;
 
-    province.splice(hexPos, 1);
-    this.setHexProvinceId(hexIndex, UNASSIGNED_PROVINCE_ID);
+    const needsSplitCheck = this.countNeighborsInProvince(hexIndex) > 1;
 
-    if (province.length > 0) {
-      if (this.countNeighborsInProvince(hexIndex, provinceId) > 1) {
-        this.splitProvince(provinceId, provinces);
-      }
+    province.delete(hexIndex);
+    this.hexProvinceIds[hexIndex] = UNASSIGNED_PROVINCE_ID;
+
+    if (province.size > 0 && needsSplitCheck) {
+      this.handleSplitProvinceChance(provinceId, provinces);
     }
   }
 
   /**
    * 
    * @param provinceId {number}
-   * @param provinces {[][]}
+   * @param provinces {Set<number>[]}
    */
-  splitProvince(provinceId, provinces) {
+  handleSplitProvinceChance(provinceId, provinces) {
     const province = provinces[provinceId];
     const groups = [];
     const visited = new Set();
-
+    
+    // Perform a depth-first search to group contiguous hexes within the province into distinct clusters.
     for (const startHex of province) {
       if (visited.has(startHex)) {
         continue;
       }
 
-      const group = [];
+      const group = new Set();
       const stack = [startHex];
       visited.add(startHex);
 
       while (stack.length > 0) {
         const curr = stack.pop();
-        group.push(curr);
+        group.add(curr);
 
         const neighbors = getHexNeighbors(curr, this.sideLength);
         for (const n of neighbors) {
-          if (!visited.has(n) && this.getHexProvinceId(n) === provinceId) {
+          if (!visited.has(n) && this.hexProvinceIds[n] === provinceId) {
             visited.add(n);
             stack.push(n);
           }
         }
       }
-
+      // Split disconnected clusters into new unique provinces and update their respective hex IDs.
       groups.push(group);
     }
 
+    // The for loop starts from 1 because the first cluster (groups[0]) is kept as the original province
     if (groups.length > 1) {
       provinces[provinceId] = groups[0];
 
@@ -419,7 +445,7 @@ export class MapState extends Uint8Array {
         provinces[newId] = newHexes;
 
         for (const h of newHexes) {
-          this.setHexProvinceId(h, newId);
+          this.hexProvinceIds[h] = newId;
         }
       }
     }
@@ -429,15 +455,14 @@ export class MapState extends Uint8Array {
    * 
    * @param hexIndex {number}
    * @param newOwner {number}
-   * @param provinces {[][]}
+   * @param provinces {Set<number>[]}
    */
   mergeOrCreateProvince(hexIndex, newOwner, provinces) {
     const neighbors = getHexNeighbors(hexIndex, this.sideLength);
     const targetProvinces = [];
 
     for (const nIdx of neighbors) {
-      const nProvinceId = this.getHexProvinceId(nIdx);
-      if (nProvinceId === UNASSIGNED_PROVINCE_ID) continue;
+      const nProvinceId = this.hexProvinceIds[nIdx];
 
       let exists = false;
       for (const existingId of targetProvinces) {
@@ -448,51 +473,101 @@ export class MapState extends Uint8Array {
       }
       if (exists) continue;
 
-      const firstHexOfProvince = provinces[nProvinceId]?.[0];
-      if (this.getHexOwner(firstHexOfProvince) === newOwner) {
-        targetProvinces.push(nProvinceId);
+      const province = provinces[nProvinceId];
+      if (province && province.size > 0) {
+        const firstHexOfProvince = province.values().next().value;
+        if (this.hexOwners[firstHexOfProvince] === newOwner) {
+          targetProvinces.push(nProvinceId);
+        }
       }
     }
 
-    if (targetProvinces.length > 0) {
-      const masterId = targetProvinces[0];
-      const masterProvince = provinces[masterId];
-
-      this.setHexProvinceId(hexIndex, masterId);
-      masterProvince.push(hexIndex);
-
-      for (let i = 1; i < targetProvinces.length; i++) {
-        const otherId = targetProvinces[i];
-        const otherProvince = provinces[otherId];
-
-        for (const h of otherProvince) {
-          this.setHexProvinceId(h, masterId);
-          masterProvince.push(h);
-        }
-        
-        otherProvince.length = 0;
-      }
-    } else {
+    if (targetProvinces.length === 0) {
       const newProvinceId = provinces.length;
-      this.setHexProvinceId(hexIndex, newProvinceId);
-      provinces[newProvinceId] = [hexIndex];
+      this.hexProvinceIds[hexIndex] = newProvinceId;
+      provinces[newProvinceId] = new Set([hexIndex]);
+      return;
+    }
+
+    const masterId = targetProvinces[0];
+    const masterProvince = provinces[masterId];
+
+    this.hexProvinceIds[hexIndex] = masterId;
+    masterProvince.add(hexIndex);
+
+    for (let i = 1; i < targetProvinces.length; i++) {
+      const otherId = targetProvinces[i];
+      const otherProvince = provinces[otherId];
+
+      for (const h of otherProvince) {
+        this.hexProvinceIds[h] = masterId;
+        masterProvince.add(h);
+      }
+
+      otherProvince.clear();
     }
   }
 
   /**
    * 
    * @param hexIndex {number}
-   * @param provinces {[][]}
+   * @param provinces {Set<number>[]}
    */
   recalculateProvince(hexIndex, provinces) {
-    const oldProvinceId = this.getHexProvinceId(hexIndex);
+    const oldProvinceId = this.hexProvinceIds[hexIndex];
     const newOwner = this.getHexOwner(hexIndex);
 
     if (oldProvinceId !== UNASSIGNED_PROVINCE_ID) {
       this.removeFromProvince(hexIndex, provinces);
     }
 
-    this.setHexProvinceId(hexIndex, UNASSIGNED_PROVINCE_ID);
+    this.hexProvinceIds[hexIndex] = UNASSIGNED_PROVINCE_ID;
     this.mergeOrCreateProvince(hexIndex, newOwner, provinces);
+  }
+
+  /**
+   * Calculates edge masks for all hexes in the map.
+   * This is a post-generation step to update the visual borders between players.
+   */
+  generateHexMaskFirst() {
+    const sideLength = this.sideLength;
+    const totalHexCount = this.hexCount;
+    const hexOwners = this.hexOwners;
+    const calculatedEdgeMasks = this.calculatedEdgeMasks;
+
+    for (let i = 0; i < totalHexCount; i++) {
+      const row = Math.floor(i / sideLength);
+      const column = i % sideLength;
+      const colOffset = row & 1;
+
+      if (column + 1 < sideLength) {
+        const currentOwner = hexOwners[i];
+        const rightOwner = hexOwners[i + 1];
+        if (currentOwner !== rightOwner) {
+          calculatedEdgeMasks[i] |= 0b000010;
+          calculatedEdgeMasks[i + 1] |= 0b010000;
+        }
+      }
+
+      if (row + 1 < sideLength) {
+        const currentOwner = hexOwners[i];
+        const indexDownRight = i + sideLength + colOffset;
+        const indexDownLeft = i + sideLength + colOffset - 1;
+
+        if (column + colOffset < sideLength) {
+          if (currentOwner !== hexOwners[indexDownRight]) {
+            calculatedEdgeMasks[i] |= 0b000001;
+            calculatedEdgeMasks[indexDownRight] |= 0b001000;
+          }
+        }
+
+        if (column + colOffset - 1 >= 0) {
+          if (currentOwner !== hexOwners[indexDownLeft]) {
+            calculatedEdgeMasks[i] |= 0b100000;
+            calculatedEdgeMasks[indexDownLeft] |= 0b000100;
+          }
+        }
+      }
+    }
   }
 }

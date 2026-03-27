@@ -42,7 +42,9 @@ export function getHexIndexFromMouseCoords(mouseX, mouseY, matrix, sideLength) {
   const col = Math.round((worldX - rowOffset) / sqrt3);
 
   // Zabezpieczenie przed wyjściem poza zakres
-  if (col < 0 || col >= sideLength || row < 0 || row >= sideLength) return INVALID_HEX_INDEX;
+  // more readable version
+  // if (col < 0 || col >= sideLength || row < 0 || row >= sideLength) return INVALID_HEX_INDEX;
+  if ((col >>> 0) >= sideLength || (row >>> 0) >= sideLength) return INVALID_HEX_INDEX;
   return row * sideLength + col;
 }
 
