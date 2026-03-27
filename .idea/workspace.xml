@@ -5,15 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="242a5297-f33e-4e49-9520-728fbf8c8dd6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/frontend/declarations.d.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/script.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/script.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/utils/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/utils/config.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/utils/glUtils.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/utils/glUtils.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/utils/mapGenerator.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/utils/mapGenerator.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/utils/mapState.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/utils/mapState.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/utils/updateBrightnessAndSaturationMax.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/utils/updateBrightnessAndSaturationMax.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/tsconfig.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -38,13 +32,13 @@
     &quot;assignee&quot;: &quot;ElectroluxV2&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "git@github.com:Kseroten1/Multiyoy.git",
-    "accountId": "55937bfd-86dc-4f25-bb0e-9502506c7255"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;git@github.com:Kseroten1/Multiyoy.git&quot;,
+    &quot;accountId&quot;: &quot;55937bfd-86dc-4f25-bb0e-9502506c7255&quot;
   },
-  "editorReviewEnabled": false
-}]]></component>
+  &quot;editorReviewEnabled&quot;: false
+}</component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
@@ -67,7 +61,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "#31 on refactor/6",
+    "git-widget-placeholder": "mate/1",
     "javascript.preferred.runtime.type.id": "bun",
     "junie.onboarding.icon.badge.shown": "true",
     "last_opened_file_path": "C:/Users/klein/RiderProjects/Multiyoy",
@@ -129,6 +123,21 @@
   </component>
   <component name="UnityCheckinConfiguration" checkUnsavedScenes="true" />
   <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="wip 1" />
+    <option name="LAST_COMMIT_MESSAGE" value="wip 1" />
+  </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
     <select />

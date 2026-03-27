@@ -8,7 +8,7 @@ import {makeHexColorMask} from "./utils/math.js";
 import {getHexIndexFromMouseCoords} from "./utils/hexLogicHelper.js";
 import {MapState} from "./utils/mapState.js";
 
-const selectedMapSideLength = MAP_SIDE_LENGTH.LIFETIME;
+const selectedMapSideLength = MAP_SIDE_LENGTH.SMALL;
 
 const config = {
   defaultBorderWidth: 0.1,

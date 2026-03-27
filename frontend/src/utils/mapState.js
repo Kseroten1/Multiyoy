@@ -537,6 +537,7 @@ export class MapState extends Uint8Array {
   }
 
   *generateSlayLikeMap() {
+    this.hexStates.fill(1);
     const unassignedHexes = Array.from({length: this.hexCount}, (_, i) => i);
     const possibleHexOwners = createHexOwners(this.playerCount);
 
