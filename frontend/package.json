@@ -10,9 +10,9 @@
   },
   "devDependencies": {
     "vite": "^7.1.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "mitata": "^1.0.34",
+    "typescript": "^6.0.2"
   },
-  "dependencies": {
-    "mitata": "^1.0.34"
-  }
+  "dependencies": {}
 }

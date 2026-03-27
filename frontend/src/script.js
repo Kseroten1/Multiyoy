@@ -7,7 +7,7 @@ import {buildWebGLProgram, getShaderLocations, initBuffer, modifyBuffer} from ".
 import {getScaledRgbColors} from "./utils/convertOklchToRgb.js";
 import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSaturationMax.js";
 import {makeHexColorMask} from "./utils/math.js";
-import {calculateHexMaskIndex, getHexIndexFromMouseCoords, getHexNeighbors} from "./utils/hexLogicHelper.js";
+import {getHexIndexFromMouseCoords} from "./utils/hexLogicHelper.js";
 import {createMap, populateProvinces} from "./utils/mapGenerator.js";
 
 const {
@@ -235,17 +235,13 @@ function initEventHandlers() {
     const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix, config.mapSideLength);
     
     const newMask = makeHexColorMask(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), Math.floor(Math.random() * 2));
-    generatedMap.setHexOwner(hexIndex, newMask);
+    const updatedHexIndices = generatedMap.setHexOwner(hexIndex, newMask, provinceHexIdsByProvinceId);
+    
     modifyBuffer(gl, bufferFill, hexIndex, [newMask]);
     
-    const hexToUpdate = [hexIndex, ...getHexNeighbors(hexIndex, config.mapSideLength)];
-    calculateHexMaskIndex(hexToUpdate, generatedMap, config.mapSideLength);
-
-    for (const hexToUpdateIndex of hexToUpdate) {
+    for (const hexToUpdateIndex of updatedHexIndices) {
       modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [generatedMap.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
-
-    generatedMap.recalculateProvince(hexIndex, provinceHexIdsByProvinceId);
     
     currentlyHighlighted = UNASSIGNED_PROVINCE_ID; 
     highlightHex(e.clientX, e.clientY);

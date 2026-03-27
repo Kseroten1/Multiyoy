@@ -48,26 +48,3 @@ export function getHexIndexFromMouseCoords(mouseX, mouseY, matrix, sideLength) {
   return row * sideLength + col;
 }
 
-export function calculateHexMaskIndex(indices, mapState, sideLength) {
-  const neighborMasks = [
-    0b000010, // East
-    0b010000, // West
-    0b000001, // LowerRight
-    0b100000, // LowerLeft
-    0b000100, // UpperRight
-    0b001000  // UpperLeft
-  ];
-
-  for (const currentIndex of indices) {
-    const neighbors = getHexNeighbors(currentIndex, sideLength);
-    const currentOwner = mapState.hexOwners[currentIndex];
-    let mask = 0;
-
-    for (const neighborId of neighbors) {
-      const i = neighbors.indexOf(neighborId);
-      if (currentOwner !== mapState.hexOwners[neighborId]) {mask |= neighborMasks[i];}
-    }
-
-    mapState.calculatedEdgeMasks[currentIndex] = mask;
-  }
-}

@@ -27,8 +27,8 @@ const selectedMapSideLength = mapSideLength.LIFETIME;
 const config = {
   defaultBorderWidth: 0.1,
   mapSideLength: selectedMapSideLength,
-  totalHexCount: selectedMapSideLength ** 2,
-  playerCount: PLAYER_COUNTS[selectedMapSideLength],
+  totalHexCount:  /** @type {number}*/ selectedMapSideLength ** 2,
+  playerCount: /** @type {number}*/ PLAYER_COUNTS[selectedMapSideLength],
   
 };
 
@@ -36,14 +36,24 @@ const mapState = new MapState(config.playerCount, selectedMapSideLength ** 2);
 
 /** @type {Set<number>[]} */
 const mainProvinceArray = [];
+/**
+ * @type {number[]}
+ */
 const unassignedHexes = [];
 
+/**
+ * @param {number} index
+ * @param {number} hexId
+ */
 function addToIndex(index, hexId) {
   // If no Set exists at this index yet, create it
   mainProvinceArray[index] ??= new Set();
   mainProvinceArray[index].add(hexId);
 }
 
+/**
+ * @param {number} playerCount
+ */
 function createHexOwners(playerCount) {
   const owners = [];
   for (let i = 0; i < COLOR_TABLE_FILL.length; i++) {
@@ -113,7 +123,7 @@ export function* populateProvinces() {
       const current = history[history.length - 1];
 
       if (mapState.getHexOwner(current) === 0) {
-        mapState.setHexOwner(current, currentOwnerMask);
+        mapState.setHexOwner(current, currentOwnerMask, null);
         mapState.setHexProvinceId(current, provinceId);
         addToIndex(provinceId, current);
         hexCountsPerPlayer[playerIdx]++;
@@ -155,8 +165,6 @@ export function* populateProvinces() {
  *     totalHexCount: number,
  *     playerCount: number,
  *   },
- *   totalHexCount: number,
- *   mapSideLength: number,
  *   provinceHexIdsByProvinceId: Set<number>[],
  * }}
  */

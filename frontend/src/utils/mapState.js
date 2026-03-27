@@ -177,6 +177,9 @@ export class MapState extends Uint8Array {
 
   setHexStateIndex(index, value) {
     this.hexStates[index] = value;
+    // Changing hex state might affect whether it's visible or its province
+    // But mostly it's used for visibility. 
+    // If it's a structural change, we should ensure consistency.
   }
 
   #hexOwners;
@@ -186,14 +189,63 @@ export class MapState extends Uint8Array {
 
   set hexOwners(value) {
     this.hexOwners.set(value);
+    this.generateHexMaskFirst();
   }
 
   getHexOwner(index) {
     return this.hexOwners[index];
   }
 
-  setHexOwner(index, value) {
+  /**
+   * @param index {number}
+   * @param value {number}
+   * @param provinces {Set<number>[] || null} 
+   * @returns number[]
+   */
+  setHexOwner(index, value, provinces) {
     this.hexOwners[index] = value;
+    
+    const updatedHexIndices = [index];
+    
+
+    this.recalculateProvince(index, provinces);
+    
+    const neighbors = getHexNeighbors(index, this.sideLength);
+    const hexToUpdateMask = [index, ...neighbors];
+    this.#calculateHexMaskIndex(hexToUpdateMask);
+    
+    for (const neighborIndex of neighbors) {
+      updatedHexIndices.push(neighborIndex);
+    }
+
+    return updatedHexIndices;
+  }
+
+  #calculateHexMaskIndex(indices) {
+    const sideLength = this.sideLength;
+    const neighborMasks = [
+      0b000010, // East
+      0b010000, // West
+      0b000001, // LowerRight
+      0b100000, // LowerLeft
+      0b000100, // UpperRight
+      0b001000  // UpperLeft
+    ];
+
+    for (const currentIndex of indices) {
+      const neighbors = getHexNeighbors(currentIndex, sideLength);
+      const currentOwner = this.hexOwners[currentIndex];
+      let mask = 0;
+
+      for (let i = 0; i < neighbors.length; i++) {
+        const neighborId = neighbors[i];
+        if (currentOwner !== this.hexOwners[neighborId]) {
+          mask |= neighborMasks[i];
+        }
+      }
+
+      this.calculatedEdgeMasks[currentIndex] = mask;
+    }
   }
 
   #hexProvinceIds;
