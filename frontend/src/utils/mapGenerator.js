@@ -29,37 +29,28 @@ export function createHexOwners(playerCount) {
  * @param {MapData} mapData
  * @param {MapLogic} mapLogic
  */
-export function* generateSlayLikeMap(mapData, mapLogic) {
-  yield { stage: "Allocating memory", progress: 0 };
+export function generateSlayLikeMap(mapData, mapLogic) {
   const hexCount = mapData.hexCount;
   const sideLength = Math.sqrt(hexCount);
   const playerCount = mapData.playerCount;
 
-  yield { stage: "Allocating memory", progress: 10 };
   mapData.hexStates.fill(1);
 
-  yield { stage: "Allocating memory", progress: 30 };
   const unassignedHexes = Array.from({length: hexCount}, (_, i) => i);
   const hexToUnassignedIndex = new Int32Array(hexCount);
   for (let i = 0; i < hexCount; i++) {
     hexToUnassignedIndex[i] = i;
   }
 
-  yield { stage: "Allocating memory", progress: 50 };
   const possibleHexOwners = createHexOwners(playerCount);
 
-  yield { stage: "Allocating memory", progress: 70 };
   const hexesPerProvince = Math.max(1, Math.floor(sideLength / 2));
   const expectedProvinceCount = Math.ceil(hexCount / hexesPerProvince) + playerCount * 2;
   mapData.ensureProvinceCapacity(expectedProvinceCount);
 
-  yield { stage: "Allocating memory", progress: 90 };
   const branchingChance = 0.5;
   const hexCountsPerPlayer = new Int32Array(playerCount);
 
-  yield { stage: "Allocating memory", progress: 100 };
-
-  yield { stage: "Generating provinces", progress: 0 };
   let assignedHexCount = 0;
   while (unassignedHexes.length > 0) {
     let playerIdx = -1;
@@ -131,22 +122,8 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
         history.pop();
       }
     }
-
-
-    const reportStep = Math.max(1, Math.floor(hexCount / 10));
-    if (assignedHexCount % reportStep === 0) {
-      const progress = Math.floor((assignedHexCount / hexCount) * 100);
-      yield { stage: "Generating provinces", progress };
-    }
   }
   
-  yield { stage: "Generating provinces", progress: 100 };
-  
-  yield { stage: "Finalizing map", progress: 0 };
-  for (const progress of mapLogic.recalculateAllProvinces(false)) {
-    yield { stage: "Finalizing map (provinces)", progress };
-  }
-  for (const progress of mapLogic.recalculateAllHexEdgeMasks()) {
-    yield { stage: "Finalizing map (edge masks)", progress };
-  }
+  mapLogic.recalculateAllProvinces();
+  mapLogic.recalculateAllHexEdgeMasks();
 }

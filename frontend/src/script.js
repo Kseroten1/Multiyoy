@@ -7,7 +7,6 @@ import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSatur
 import {makeHexColorMask} from "./utils/math.js";
 import {getHexIndexFromMouseCoords} from "./utils/hexLogicHelper.js";
 import {MapState} from "./utils/mapState.js";
-import {generateSlayLikeMap} from "./utils/mapGenerator.js";
 
 const selectedMapSideLength = MAP_SIDE_LENGTH.LIFETIME;
 
@@ -28,7 +27,7 @@ const bInput = /** @type {HTMLInputElement} */ (document.getElementById("brightn
 const sInput = /** @type {HTMLInputElement} */ (document.getElementById("saturation"));
 const generationUi = /** @type {HTMLElement} */ (document.getElementById("generation-ui"));
 const stageLabel = /** @type {HTMLElement} */ (document.getElementById("stage-label"));
-const progressBar = /** @type {HTMLProgressElement} */ (document.getElementById("progress-bar"));
+const generationTime = /** @type {HTMLElement} */ (document.getElementById("generation-time"));
 
 // TODO: `updateBrightnessAndSaturationMax` can be done once and only at compile time
 const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
@@ -118,44 +117,48 @@ initEventHandlers();
 void animateMapGeneration();
 
 
-/**
- * 
- * @param generator {Generator<{stage: string, progress: number}>} An iterable that yields map generation status.
- * @param onUpdate { () => void } A callback function to update buffers and schedule a render.
- */
-async function processInBatches(generator, onUpdate) {
-  generationUi.style.display = "block";
-  let updateScheduled = false;
-  for (const status of generator) {
-
-    if (!updateScheduled) {
-      updateScheduled = true;
-      requestAnimationFrame(() => {
-        onUpdate?.();
-        stageLabel.textContent = status.stage;
-        progressBar.value = status.progress;
-        updateScheduled = false;
-      });
-    }
-    if ("scheduler" in window && "yield" in window.scheduler) {
-      await window.scheduler.yield();
-    } else {
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
-  }
-  generationUi.style.display = "none";
-  onUpdate?.();
-}
-
 async function animateMapGeneration() {
-  await processInBatches(
-    generateSlayLikeMap(mapState.data, mapState.logic),
-    () => {
-      modifyBuffer(gl, bufferFill, 0, mapState.renderer.fillMasksArray);
-      scheduleRender();
-    },
-  );
+  generationUi.style.display = "block";
+  stageLabel.textContent = "Generating map...";
 
+  const startTime = performance.now();
+  let isGenerating = true;
+
+  function updateTimer() {
+    if (!isGenerating) return;
+    const elapsed = (performance.now() - startTime) / 1000;
+    generationTime.textContent = elapsed.toFixed(3) + "s";
+    requestAnimationFrame(updateTimer);
+  }
+  requestAnimationFrame(updateTimer);
+
+  const worker = new Worker(new URL("./mapWorker.js", import.meta.url), { type: "module" });
+
+  worker.postMessage({
+    hexCount: config.totalHexCount,
+    playerCount: config.playerCount,
+    sharedBuffer: mapState.data.byteArray.buffer,
+    sharedEdgeBuffer: mapState.data.calculatedEdgeMasks.buffer,
+  });
+
+  await new Promise((resolve) => {
+    worker.onmessage = (e) => {
+      if (e.data.status === "done") {
+        resolve(null);
+      }
+    };
+  });
+
+  worker.terminate();
+
+  mapState.data.reconstructProvinceHexIds();
+
+  isGenerating = false;
+  const finalTime = (performance.now() - startTime) / 1000;
+  generationTime.textContent = finalTime.toFixed(3) + "s";
+  stageLabel.textContent = "Generation complete!";
+
+  modifyBuffer(gl, bufferFill, 0, mapState.renderer.fillMasksArray);
   modifyBuffer(gl, bufferEdge, 0, mapState.data.calculatedEdgeMasks);
   scheduleRender();
 }

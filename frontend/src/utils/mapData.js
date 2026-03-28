@@ -90,14 +90,16 @@ export class MapData {
   /**
    * @param {number} hexCount
    * @param {number} playerCount
+   * @param {SharedArrayBuffer} [sharedBuffer]
+   * @param {SharedArrayBuffer} [sharedEdgeBuffer]
    */
-  constructor(hexCount, playerCount) {
+  constructor(hexCount, playerCount, sharedBuffer, sharedEdgeBuffer) {
     this.dimensions = calculateMapStateDimensions(hexCount, 0);
     
     // Max capacity: provinces cannot exceed hex count in Multiyoy rules.
     const maxDimensions = calculateMapStateDimensions(hexCount, hexCount);
     
-    const buffer = new ArrayBuffer(this.dimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
+    const buffer = sharedBuffer ?? new SharedArrayBuffer(this.dimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
 
     this.byteArray = new Uint8Array(buffer);
     this.dataView = new DataView(buffer);
@@ -109,8 +111,9 @@ export class MapData {
     /** @type {ProvinceHexIdsByProvinceId} */
     this.provinceHexIdsByProvinceId = [new Set()];
 
+    const edgeBuffer = sharedEdgeBuffer ?? new SharedArrayBuffer(hexCount * 4);
     /** @type {Float32Array} */
-    this.calculatedEdgeMasks = new Float32Array(hexCount);
+    this.calculatedEdgeMasks = new Float32Array(edgeBuffer);
   }
 
   /**
@@ -154,64 +157,49 @@ export class MapData {
     const newCapacity = Math.max(count, Math.floor(currentProvinceCount * 1.5));
     const growDimensions = calculateMapStateDimensions(this.hexCount, Math.min(this.hexCount, newCapacity));
 
-    this.byteArray.buffer.resize(growDimensions.totalArraySize);
+    this.byteArray.buffer.grow(growDimensions.totalArraySize);
     this.dimensions = growDimensions;
   }
 
-  #hexCount;
   get hexCount() {
-    this.#hexCount ??= (this.dataView.getUint8(this.dimensions.hexCountOffset) << 16) | this.dataView.getUint16(this.dimensions.hexCountOffset + 1);
-    return this.#hexCount;
+    return (this.dataView.getUint8(this.dimensions.hexCountOffset) << 16) | this.dataView.getUint16(this.dimensions.hexCountOffset + 1);
   }
 
   set hexCount(number) {
-    this.#hexCount = number;
     this.dataView.setUint8(this.dimensions.hexCountOffset, (number >> 16) & 0xff);
     this.dataView.setUint16(this.dimensions.hexCountOffset + 1, number & 0xffff);
   }
 
-  #playerCount;
   get playerCount() {
-    this.#playerCount ??= this.dataView.getUint16(this.dimensions.playerCountOffset);
-    return this.#playerCount;
+    return this.dataView.getUint16(this.dimensions.playerCountOffset);
   }
 
   set playerCount(value) {
-    this.#playerCount = value;
     this.dataView.setUint16(this.dimensions.playerCountOffset, value);
   }
 
-  #currentPlayer;
   get currentPlayer() {
-    this.#currentPlayer ??= this.dataView.getUint16(this.dimensions.currentPlayerOffset);
-    return this.#currentPlayer;
+    return this.dataView.getUint16(this.dimensions.currentPlayerOffset);
   }
 
   set currentPlayer(value) {
-    this.#currentPlayer = value;
     this.dataView.setUint16(this.dimensions.currentPlayerOffset, value);
   }
 
-  #currentRound;
   get currentRound() {
-    this.#currentRound ??= this.dataView.getUint32(this.dimensions.currentRoundOffset);
-    return this.#currentRound;
+    return this.dataView.getUint32(this.dimensions.currentRoundOffset);
   }
 
   set currentRound(value) {
-    this.#currentRound = value;
     this.dataView.setUint32(this.dimensions.currentRoundOffset, value);
   }
 
-  #provinceCount;
   get provinceCount() {
-    this.#provinceCount ??= this.dataView.getUint32(this.dimensions.provinceCountOffset);
-    return this.#provinceCount;
+    return this.dataView.getUint32(this.dimensions.provinceCountOffset);
   }
 
   set provinceCount(value) {
     this.ensureProvinceCapacity(value);
-    this.#provinceCount = value;
     this.dataView.setUint32(this.dimensions.provinceCountOffset, value);
   }
 
@@ -238,14 +226,11 @@ export class MapData {
     this.hexProvinceIds.set(value);
   }
 
-  #maxProvinceFinance;
   get maxProvinceFinance() {
-    this.#maxProvinceFinance ??= this.dataView.getUint32(this.dimensions.maxProvinceFinanceOffset);
-    return this.#maxProvinceFinance;
+    return this.dataView.getUint32(this.dimensions.maxProvinceFinanceOffset);
   }
 
   set maxProvinceFinance(value) {
-    this.#maxProvinceFinance = value;
     this.dataView.setUint32(this.dimensions.maxProvinceFinanceOffset, value);
   }
 
@@ -256,5 +241,15 @@ export class MapData {
 
   set provinceFinanceStates(value) {
     this.provinceFinanceStates.set(value);
+  }
+
+  reconstructProvinceHexIds() {
+    this.provinceHexIdsByProvinceId = [];
+
+    for (let i = 0; i < this.hexCount; i++) {
+      const provinceId = this.hexProvinceIds[i];
+      this.provinceHexIdsByProvinceId[provinceId] ??= new Set();
+      this.provinceHexIdsByProvinceId[provinceId].add(i);
+    }
   }
 }

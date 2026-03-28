@@ -24,6 +24,7 @@ describe('MapData Resizing', () => {
     const playerCount = 2;
     const mapData = new MapData(hexCount, playerCount);
     
+    mapData.provinceCount = 10;
     mapData.hexOwners[0] = 42;
     mapData.provinceFinanceStates[0] = 1337;
     
