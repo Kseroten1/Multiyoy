@@ -90,16 +90,12 @@ export class MapData {
   /**
    * @param {number} hexCount
    * @param {number} playerCount
-   * @param {number} initialProvinceCount
    */
-  constructor(hexCount, playerCount, initialProvinceCount = 0) {
-    const minProvinceCount = 1;
-    const initialCount = Math.max(initialProvinceCount, minProvinceCount);
-    this.dimensions = calculateMapStateDimensions(hexCount, initialCount);
+  constructor(hexCount, playerCount) {
+    this.dimensions = calculateMapStateDimensions(hexCount, 0);
     
     // Max capacity: provinces cannot exceed hex count in Multiyoy rules.
-    const maxProvinceCount = Math.max(hexCount, initialCount);
-    const maxDimensions = calculateMapStateDimensions(hexCount, maxProvinceCount);
+    const maxDimensions = calculateMapStateDimensions(hexCount, hexCount);
     
     const buffer = new ArrayBuffer(this.dimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
 
@@ -107,7 +103,7 @@ export class MapData {
     this.dataView = new DataView(buffer);
     this.hexCount = hexCount;
     this.playerCount = playerCount;
-    this.provinceCount = initialCount;
+    this.provinceCount = 0;
     
     /** @typedef {Set<number>[]} ProvinceHexIdsByProvinceId */
     /** @type {ProvinceHexIdsByProvinceId} */
@@ -117,17 +113,49 @@ export class MapData {
     this.calculatedEdgeMasks = new Float32Array(hexCount);
   }
 
+  /**
+   * @param {ArrayBuffer} buffer
+   */
+  static fromBuffer(buffer) {
+    // This will be used by save files / multiplayer
+    const dataView = new DataView(buffer);
+    const hexCount = (dataView.getUint8(0) << 16) | dataView.getUint16(1);
+    const playerCount = dataView.getUint16(3);
+    const provinceCount = dataView.getUint32(11);
+
+    const mapData = new MapData(hexCount, playerCount);
+    mapData.ensureProvinceCapacity(provinceCount);
+    const sourceData = new Uint8Array(buffer);
+    const dataToCopy = sourceData.subarray(0, Math.min(sourceData.length, mapData.byteArray.length));
+    mapData.byteArray.set(dataToCopy);
+    mapData.provinceCount = provinceCount;
+
+    const hexProvinceIds = mapData.hexProvinceIds;
+    for (let i = 0; i < hexCount; i++) {
+      const provinceId = hexProvinceIds[i];
+      if (provinceId !== 0) {
+        while (mapData.provinceHexIdsByProvinceId.length <= provinceId) {
+          mapData.provinceHexIdsByProvinceId.push(new Set());
+        }
+        mapData.provinceHexIdsByProvinceId[provinceId].add(i);
+      }
+    }
+
+    return mapData;
+  }
+
   ensureProvinceCapacity(count) {
     const neededDimensions = calculateMapStateDimensions(this.hexCount, count);
     if (this.byteArray.buffer.byteLength >= neededDimensions.totalArraySize) {
       return;
     }
 
-    this.byteArray.buffer.resize(neededDimensions.totalArraySize);
-    this.dimensions = neededDimensions;
+    const currentProvinceCount = this.provinceCount;
+    const newCapacity = Math.max(count, Math.floor(currentProvinceCount * 1.5));
+    const growDimensions = calculateMapStateDimensions(this.hexCount, Math.min(this.hexCount, newCapacity));
 
-    // Invalidate cached views that might depend on total length or provinceCount
-    this.#provinceFinanceStates = null;
+    this.byteArray.buffer.resize(growDimensions.totalArraySize);
+    this.dimensions = growDimensions;
   }
 
   #hexCount;
@@ -185,7 +213,6 @@ export class MapData {
     this.ensureProvinceCapacity(value);
     this.#provinceCount = value;
     this.dataView.setUint32(this.dimensions.provinceCountOffset, value);
-    this.#provinceFinanceStates = null;
   }
 
   #hexStates;
@@ -224,7 +251,7 @@ export class MapData {
 
   #provinceFinanceStates;
   get provinceFinanceStates() {
-    return this.#provinceFinanceStates ??= new Uint32Array(this.byteArray.buffer, this.dimensions.provinceFinanceStateOffset, this.provinceCount);
+    return this.#provinceFinanceStates ??= new Uint32Array(this.byteArray.buffer, this.dimensions.provinceFinanceStateOffset);
   }
 
   set provinceFinanceStates(value) {

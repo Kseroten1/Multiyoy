@@ -39,6 +39,8 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
   const possibleHexOwners = createHexOwners(playerCount);
 
   const hexesPerProvince = Math.max(1, Math.floor(sideLength / 2));
+  const expectedProvinceCount = Math.ceil(hexCount / hexesPerProvince) + playerCount * 2;
+  mapData.ensureProvinceCapacity(expectedProvinceCount);
   const branchingChance = 0.5;
   let generatedProvinceCount = 0;
   const hexCountsPerPlayer = new Int32Array(playerCount);

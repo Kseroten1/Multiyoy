@@ -5,7 +5,7 @@ describe('MapData Resizing', () => {
   it('should resize when increasing provinceCount', () => {
     const hexCount = 100;
     const playerCount = 2;
-    const mapData = new MapData(hexCount, playerCount, 0);
+    const mapData = new MapData(hexCount, playerCount);
     
     const initialSize = mapData.byteArray.length;
     mapData.provinceCount = 10;
@@ -22,7 +22,7 @@ describe('MapData Resizing', () => {
   it('maintains data when resizing', () => {
     const hexCount = 50;
     const playerCount = 2;
-    const mapData = new MapData(hexCount, playerCount, 5);
+    const mapData = new MapData(hexCount, playerCount);
     
     mapData.hexOwners[0] = 42;
     mapData.provinceFinanceStates[0] = 1337;
