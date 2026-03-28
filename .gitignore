@@ -6,3 +6,5 @@ riderModule.iml
 dist/
 node_modules
 bun.lock
+.idea
+.ai
