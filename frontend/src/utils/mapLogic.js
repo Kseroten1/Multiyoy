@@ -18,18 +18,11 @@ export class MapLogic {
   setHexOwner(index, value) {
     this.mapData.hexOwners[index] = value;
     
-    const updatedHexIndices = [index];
-
     this.#recalculateProvince(index);
     
-    const neighbors = getHexNeighbors(index, this.sideLength);
-    const hexToUpdateMask = [index, ...neighbors];
-    this.#calculateHexMaskIndex(hexToUpdateMask);
+    const updatedHexIndices = [index, ...getHexNeighbors(index, this.sideLength)];
+    this.#calculateHexMaskIndex(updatedHexIndices);
     
-    for (const neighborIndex of neighbors) {
-      updatedHexIndices.push(neighborIndex);
-    }
-
     return updatedHexIndices;
   }
 

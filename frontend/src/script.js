@@ -42,7 +42,12 @@ const gl = /** @type {WebGL2RenderingContext} */ (mainCanvas.getContext("webgl2"
 const gl2 = /** @type {WebGL2RenderingContext} */ (highlightCanvas.getContext("webgl2", canvasOptions));
 
 // Used for controls related calculations (camera origin, zoom, pan)
-const viewMatrix = new DOMMatrix().scaleSelf(0.8);
+const viewMatrix = new DOMMatrix();
+// Center camera on map
+const centerX = (config.mapSideLength - 1) * 1.73205081 * 0.5;
+const centerY = (config.mapSideLength - 1) * 1.5 * 0.5;
+viewMatrix.scaleSelf(0.25).translateSelf(-centerX, -centerY);
+
 // Used for window related calculations (window size, device pixel ratio)
 let projectionMatrix = new DOMMatrix();
 
