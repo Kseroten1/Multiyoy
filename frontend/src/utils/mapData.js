@@ -1,8 +1,8 @@
 /**
  * @param {number} hexCount
+ * @param {number} provinceCount
  */
-function calculateMapStateDimensions(hexCount) {
-  const provinceCount = hexCount / 4;
+function calculateMapStateDimensions(hexCount, provinceCount) {
 
   let currentOffset = 0;
 
@@ -36,20 +36,20 @@ function calculateMapStateDimensions(hexCount) {
   const hexOwnerOffset = currentOffset;
   currentOffset += hexOwnerInBytesPerElement * hexCount;
 
-  // Align for Uint32Array (2 bytes)
-  if (currentOffset % 2 !== 0) currentOffset++;
+  // Align for Uint32Array (4 bytes)
+  if (currentOffset % 4 !== 0) currentOffset += (4 - (currentOffset % 4));
   const hexProvinceIdInBytesPerElement = 4;
   const hexProvinceIdOffset = currentOffset;
   currentOffset += hexProvinceIdInBytesPerElement * hexCount;
 
-  // Align for maxProvinceFinance (2 bytes)
-  if (currentOffset % 2 !== 0) currentOffset++;
+  // Align for maxProvinceFinance (4 bytes)
+  if (currentOffset % 4 !== 0) currentOffset += (4 - (currentOffset % 4));
   const maxProvinceFinanceInBytes = 4;
   const maxProvinceFinanceOffset = currentOffset;
   currentOffset += maxProvinceFinanceInBytes;
 
-  // Align for Uint32Array (2 bytes)
-  if (currentOffset % 2 !== 0) currentOffset++;
+  // Align for Uint32Array (4 bytes)
+  if (currentOffset % 4 !== 0) currentOffset += (4 - (currentOffset % 4));
   const provinceFinanceStateInBytesPerElement = 4;
   const provinceFinanceStateOffset = currentOffset;
   currentOffset += provinceFinanceStateInBytesPerElement * provinceCount;
@@ -79,27 +79,55 @@ function calculateMapStateDimensions(hexCount) {
   });
 }
 
-export class MapData extends Uint8Array {
-  dataView = new DataView(this.buffer)
-  dimensions
+export class MapData {
+  /** @type {Uint8Array} */
+  byteArray;
+  /** @type {DataView} */
+  dataView;
+  /** @type {ReturnType<calculateMapStateDimensions>} */
+  dimensions;
 
   /**
    * @param {number} hexCount
    * @param {number} playerCount
+   * @param {number} initialProvinceCount
    */
-  constructor(hexCount, playerCount) {
-    const dimensions = calculateMapStateDimensions(hexCount);
-    super(dimensions.totalArraySize);
-    this.dimensions = dimensions;
+  constructor(hexCount, playerCount, initialProvinceCount = 0) {
+    const minProvinceCount = 1;
+    const initialCount = Math.max(initialProvinceCount, minProvinceCount);
+    this.dimensions = calculateMapStateDimensions(hexCount, initialCount);
+    
+    // Max capacity: provinces cannot exceed hex count in Multiyoy rules.
+    const maxProvinceCount = Math.max(hexCount, initialCount);
+    const maxDimensions = calculateMapStateDimensions(hexCount, maxProvinceCount);
+    
+    const buffer = new ArrayBuffer(this.dimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
+
+    this.byteArray = new Uint8Array(buffer);
+    this.dataView = new DataView(buffer);
     this.hexCount = hexCount;
     this.playerCount = playerCount;
+    this.provinceCount = initialCount;
     
     /** @typedef {Set<number>[]} ProvinceHexIdsByProvinceId */
     /** @type {ProvinceHexIdsByProvinceId} */
-    this.provinceHexIdsByProvinceId = [];
+    this.provinceHexIdsByProvinceId = [new Set()];
 
     /** @type {Float32Array} */
     this.calculatedEdgeMasks = new Float32Array(hexCount);
+  }
+
+  ensureProvinceCapacity(count) {
+    const neededDimensions = calculateMapStateDimensions(this.hexCount, count);
+    if (this.byteArray.buffer.byteLength >= neededDimensions.totalArraySize) {
+      return;
+    }
+
+    this.byteArray.buffer.resize(neededDimensions.totalArraySize);
+    this.dimensions = neededDimensions;
+
+    // Invalidate cached views that might depend on total length or provinceCount
+    this.#provinceFinanceStates = null;
   }
 
   #hexCount;
@@ -154,27 +182,29 @@ export class MapData extends Uint8Array {
   }
 
   set provinceCount(value) {
+    this.ensureProvinceCapacity(value);
     this.#provinceCount = value;
     this.dataView.setUint32(this.dimensions.provinceCountOffset, value);
+    this.#provinceFinanceStates = null;
   }
 
   #hexStates;
   get hexStates() {
-    return this.#hexStates ??= new Uint8Array(this.buffer, this.dimensions.hexStateOffset, this.dimensions.hexStateInBytesPerElement * this.hexCount);
+    return this.#hexStates ??= new Uint8Array(this.byteArray.buffer, this.dimensions.hexStateOffset, this.dimensions.hexStateInBytesPerElement * this.hexCount);
   }
 
   set hexStates(value) {
-    this.set(value, this.dimensions.hexStateOffset);
+    this.byteArray.set(value, this.dimensions.hexStateOffset);
   }
 
   #hexOwners;
   get hexOwners() {
-    return this.#hexOwners ??= new Uint16Array(this.buffer, this.dimensions.hexOwnerOffset, this.hexCount);
+    return this.#hexOwners ??= new Uint16Array(this.byteArray.buffer, this.dimensions.hexOwnerOffset, this.hexCount);
   }
 
   #hexProvinceIds;
   get hexProvinceIds() {
-    return this.#hexProvinceIds ??= new Uint32Array(this.buffer, this.dimensions.hexProvinceIdOffset, this.hexCount);
+    return this.#hexProvinceIds ??= new Uint32Array(this.byteArray.buffer, this.dimensions.hexProvinceIdOffset, this.hexCount);
   }
 
   set hexProvinceIds(value) {
@@ -194,7 +224,7 @@ export class MapData extends Uint8Array {
 
   #provinceFinanceStates;
   get provinceFinanceStates() {
-    return this.#provinceFinanceStates ??= new Uint32Array(this.buffer, this.dimensions.provinceFinanceStateOffset, this.provinceCount);
+    return this.#provinceFinanceStates ??= new Uint32Array(this.byteArray.buffer, this.dimensions.provinceFinanceStateOffset, this.provinceCount);
   }
 
   set provinceFinanceStates(value) {

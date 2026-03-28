@@ -40,8 +40,7 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
 
   const hexesPerProvince = Math.max(1, Math.floor(sideLength / 2));
   const branchingChance = 0.5;
-  let provinceId = 1;
-
+  let generatedProvinceCount = 0;
   const hexCountsPerPlayer = new Int32Array(playerCount);
 
   while (unassignedHexes.length > 0) {
@@ -66,15 +65,14 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
     
     const history = [startHex];
     let count = 0;
+    let lastAssignedProvinceId = -1;
 
     while (count < hexesPerProvince && history.length > 0) {
       const current = history[history.length - 1];
 
       if (mapData.hexOwners[current] === 0) {
         mapLogic.setHexOwner(current, currentOwnerMask);
-        mapData.hexProvinceIds[current] = provinceId;
-        mapData.provinceHexIdsByProvinceId[provinceId] ??= new Set();
-        mapData.provinceHexIdsByProvinceId[provinceId].add(current);
+        lastAssignedProvinceId = mapData.hexProvinceIds[current];
         hexCountsPerPlayer[playerIdx]++;
         count++;
       }
@@ -99,8 +97,8 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
       }
     }
 
-    yield provinceId;
-    provinceId++;
+    yield lastAssignedProvinceId;
+    generatedProvinceCount++;
   }
   
   mapLogic.recalculateAllHexEdgeMasks();

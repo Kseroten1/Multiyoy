@@ -106,6 +106,7 @@ export class MapLogic {
         const newHexes = groups[i];
 
         this.mapData.provinceHexIdsByProvinceId[newId] = newHexes;
+        this.mapData.provinceCount = this.mapData.provinceHexIdsByProvinceId.length;
 
         for (const h of newHexes) {
           this.mapData.hexProvinceIds[h] = newId;
@@ -147,6 +148,7 @@ export class MapLogic {
       const newProvinceId = this.mapData.provinceHexIdsByProvinceId.length;
       this.mapData.hexProvinceIds[hexIndex] = newProvinceId;
       this.mapData.provinceHexIdsByProvinceId[newProvinceId] = new Set([hexIndex]);
+      this.mapData.provinceCount = this.mapData.provinceHexIdsByProvinceId.length;
       return;
     }
 
