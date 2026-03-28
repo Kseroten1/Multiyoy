@@ -26,6 +26,9 @@ const state = {
 
 const bInput = /** @type {HTMLInputElement} */ (document.getElementById("brightness"));
 const sInput = /** @type {HTMLInputElement} */ (document.getElementById("saturation"));
+const generationUi = /** @type {HTMLElement} */ (document.getElementById("generation-ui"));
+const stageLabel = /** @type {HTMLElement} */ (document.getElementById("stage-label"));
+const progressBar = /** @type {HTMLProgressElement} */ (document.getElementById("progress-bar"));
 
 // TODO: `updateBrightnessAndSaturationMax` can be done once and only at compile time
 const [maxB, maxS] = updateBrightnessAndSaturationMax(COLOR_TABLE_FILL);
@@ -117,27 +120,36 @@ void animateMapGeneration();
 
 /**
  * 
- * @param generator {Iterable<number>} An iterable that yields provinceIds.
- * @param batchSize {number} The number of provinces to process before calling onUpdate.
+ * @param generator {Generator<{stage: string, progress: number}>} An iterable that yields map generation status.
  * @param onUpdate { () => void } A callback function to update buffers and schedule a render.
  */
-async function processInBatches(generator, batchSize, onUpdate) {
-  let count = 0;
-  for (const _ of generator) {
-    count++;
-    if (count % batchSize === 0) {
-      onUpdate?.();
-      await new Promise(requestAnimationFrame);
+async function processInBatches(generator, onUpdate) {
+  generationUi.style.display = "block";
+  let updateScheduled = false;
+  for (const status of generator) {
+
+    if (!updateScheduled) {
+      updateScheduled = true;
+      requestAnimationFrame(() => {
+        onUpdate?.();
+        stageLabel.textContent = status.stage;
+        progressBar.value = status.progress;
+        updateScheduled = false;
+      });
+    }
+    if ("scheduler" in window && "yield" in window.scheduler) {
+      await window.scheduler.yield();
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
   }
+  generationUi.style.display = "none";
   onUpdate?.();
 }
 
 async function animateMapGeneration() {
-  const batchSize = Math.ceil(config.mapSideLength) * 5;
   await processInBatches(
     generateSlayLikeMap(mapState.data, mapState.logic),
-    batchSize,
     () => {
       modifyBuffer(gl, bufferFill, 0, mapState.renderer.fillMasksArray);
       scheduleRender();

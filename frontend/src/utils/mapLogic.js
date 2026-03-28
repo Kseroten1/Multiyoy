@@ -10,7 +10,6 @@ export class MapLogic {
     this.sideLength = Math.sqrt(mapData.hexCount);
   }
 
-
   /**
    * @param index {number}
    * @param value {number}
@@ -232,12 +231,36 @@ export class MapLogic {
     }
   }
 
-  recalculateAllHexEdgeMasks() {
+  *recalculateAllProvinces(clearExisting = true) {
+    const hexCount = this.mapData.hexCount;
+    if (clearExisting) {
+      this.mapData.provinceHexIdsByProvinceId = [new Set()];
+      this.mapData.hexProvinceIds.fill(UNASSIGNED_PROVINCE_ID);
+      this.mapData.provinceCount = 1;
+    }
+
+    const reportStep = Math.max(1, Math.floor(hexCount / 10));
+    for (let i = 0; i < hexCount; i++) {
+      const owner = this.mapData.hexOwners[i];
+      if (owner === 0) continue;
+      if (this.mapData.hexProvinceIds[i] !== UNASSIGNED_PROVINCE_ID) continue;
+
+      this.mergeOrCreateProvince(i, owner);
+      if (i % reportStep === 0) {
+        yield Math.floor((i / hexCount) * 100);
+      }
+    }
+    yield 100;
+  }
+
+  *recalculateAllHexEdgeMasks() {
     const sideLength = this.sideLength;
     const totalHexCount = this.mapData.hexCount;
     const hexOwners = this.mapData.hexOwners;
     const calculatedEdgeMasks = this.mapData.calculatedEdgeMasks;
+    calculatedEdgeMasks.fill(0);
 
+    const reportStep = Math.max(1, Math.floor(totalHexCount / 10));
     for (let i = 0; i < totalHexCount; i++) {
       const row = Math.floor(i / sideLength);
       const column = i % sideLength;
@@ -271,7 +294,11 @@ export class MapLogic {
           }
         }
       }
+      if (i % reportStep === 0) {
+        yield Math.floor((i / totalHexCount) * 100);
+      }
     }
+    yield 100;
   }
 
   /**
