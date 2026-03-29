@@ -47,4 +47,3 @@ export function getHexIndexFromMouseCoords(mouseX, mouseY, matrix, sideLength) {
   if ((col >>> 0) >= sideLength || (row >>> 0) >= sideLength) return INVALID_HEX_INDEX;
   return row * sideLength + col;
 }
-

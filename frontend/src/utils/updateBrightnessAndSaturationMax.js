@@ -1,3 +1,7 @@
+/**
+ * @param {[number, number, number][]} oklchColorsTable
+ * @returns {[string, string]}
+ */
 export function updateBrightnessAndSaturationMax(oklchColorsTable) {
     const L_Values = oklchColorsTable.map(([L]) => L);
     const C_Values = oklchColorsTable.map(([_, C]) => C);

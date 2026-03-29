@@ -1,5 +1,10 @@
+/**
+ * @param {WebGL2RenderingContext} gl
+ * @param {number} type
+ * @param {string} source
+ */
 function createShader(gl, type, source) {
-    const shader = gl.createShader(type);
+    const shader = /** @type {WebGLShader} */ (gl.createShader(type));
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
 
@@ -29,27 +34,29 @@ export function buildWebGLProgram(context, vertexShader, fragmentShader) {
   return {program, vao};
 }
 
+/**
+ * @param {WebGL2RenderingContext} context
+ * @param {WebGLProgram} program
+ */
 export function getShaderLocations(context, program) {
   return {
-    mvp: context.getUniformLocation(program, "u_mvp"),
-    borderWidth: context.getUniformLocation(program, "u_borderWidth"),
-    mapWidth: context.getUniformLocation(program, "u_mapWidth"),
-    hexIndex: context.getUniformLocation(program, "u_index"),
+    mvp: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "u_mvp")),
+    borderWidth: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "u_borderWidth")),
+    mapWidth: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "u_mapWidth")),
+    hexIndex: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "u_index")),
+    edgeColor: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "u_edgeColor")),
+    fillColors: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "FILL_COLORS")),
 
-    edgeColor: context.getUniformLocation(program, "u_edgeColor"),
-    hexIndexAttrib: context.getAttribLocation(program, "a_hexIndex"),
-    edgeMask: context.getAttribLocation(program, "a_edgeMask"),
-    fillColorMask: context.getAttribLocation(program, "a_fillColorMask"),
-
-    fillColors: context.getUniformLocation(program, "FILL_COLORS"),
+    hexIndexAttrib: /** @type {GLint} */ (context.getAttribLocation(program, "a_hexIndex")),
+    edgeMask: /** @type {GLint} */ (context.getAttribLocation(program, "a_edgeMask")),
+    fillColorMask: /** @type {GLint} */ (context.getAttribLocation(program, "a_fillColorMask")),
   }
 }
 
 /**
- *
  * @param context {WebGL2RenderingContext}
  * @param location {GLuint}
- * @param data {ArrayLike<unknown> | unknown[]}
+ * @param data {ArrayLike<number>}
  * @param size {number}
  * @returns {WebGLBuffer}
  */
@@ -65,11 +72,10 @@ export function initBuffer(context, location, data, size) {
 }
 
 /**
- *
  * @param context {WebGL2RenderingContext}
  * @param buffer {WebGLBuffer}
  * @param offset {number}
- * @param data {ArrayLike<unknown> | unknown[]}
+ * @param data {ArrayLike<number>}
  */
 export function modifyBuffer(context, buffer, offset, data) {
   context.bindBuffer(context.ARRAY_BUFFER, buffer);
