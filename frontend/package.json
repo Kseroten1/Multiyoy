@@ -9,8 +9,8 @@
     "preview": "bunx vite preview"
   },
   "devDependencies": {
-    "vite": "^7.1.4",
-    "vitest": "^4.0.18",
+    "vite": "^8.0.3",
+    "vitest": "^4.1.2",
     "mitata": "^1.0.34",
     "typescript": "^6.0.2"
   },

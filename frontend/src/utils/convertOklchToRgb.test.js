@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { convertOklchToSrgb } from './convertOklchToSrgb.js'
+import { convertOklchToRgb } from './convertOklchToRgb.js'
 
 const sampleColors = [
     [[0.7804, 0.099, 228.76], [0.431372549, 0.768627451, 0.9176470588]],
@@ -9,7 +9,7 @@ const sampleColors = [
 ]
 
 test.each(sampleColors)('OKLCH → sRGB conversion', (oklch, expected) => {
-    const [[r, g, b]] = convertOklchToSrgb([oklch]);
+    const [r, g, b] = convertOklchToRgb(...oklch);
     const [er, eg, eb] = expected;
 
     expect(r).toBeCloseTo(er, 2);
