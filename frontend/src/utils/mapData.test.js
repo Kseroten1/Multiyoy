@@ -6,7 +6,7 @@ describe('MapData Resizing', () => {
     const hexCount = 100;
     const playerCount = 2;
     const mapData = new MapData(hexCount, playerCount, 0);
-
+    
     const initialSize = mapData.byteArray.length;
     mapData.provinceCount = 10;
     expect(mapData.provinceCount).toBe(10);
@@ -23,10 +23,10 @@ describe('MapData Resizing', () => {
     const hexCount = 50;
     const playerCount = 2;
     const mapData = new MapData(hexCount, playerCount, 5);
-
+    
     mapData.hexOwners[0] = 42;
     mapData.provinceFinanceStates[0] = 1337;
-
+    
     mapData.provinceCount = 50;
     expect(mapData.hexOwners[0]).toBe(42);
     expect(mapData.provinceFinanceStates[0]).toBe(1337);

@@ -103,8 +103,8 @@ const secondHexBufferEdge = initBuffer(
 );
 
 const secondHexIndexBuffer = initBuffer(
-  gl2,
-  secondHexProgramLocations.hexIndexAttrib,
+  gl2, 
+  secondHexProgramLocations.hexIndexAttrib, 
   emptyData,
   1,
 )
@@ -116,7 +116,7 @@ void animateMapGeneration();
 
 
 /**
- *
+ * 
  * @param generator {Iterable<number>} An iterable that yields provinceIds.
  * @param batchSize {number} The number of provinces to process before calling onUpdate.
  * @param onUpdate { () => void } A callback function to update buffers and schedule a render.
@@ -160,11 +160,11 @@ function highlightHex(mouseX, mouseY) {
   if (hexIndex === INVALID_HEX_INDEX) return;
   const provinceId = mapState.data.hexProvinceIds[hexIndex];
   if (provinceId === UNASSIGNED_PROVINCE_ID || currentlyHighlighted === provinceId) {return;}
-
+  
   const renderData = mapState.renderer.getProvinceRenderData(provinceId);
-
+  
   highlightHexCount = renderData.count;
-
+  
   gl2.uniform1i(secondHexProgramLocations.hexIndex, hexIndex);
   modifyBuffer(gl2, secondHexIndexBuffer, 0, renderData.indices);
   gl2.uniform3fv(secondHexProgramLocations.fillColors, getScaledRgbColors(+bInput.value * 1.5, +sInput.value * 1.5, COLOR_TABLE_FILL))
@@ -195,7 +195,7 @@ function onResize() {
   mainCanvas.height = window.innerHeight * dpr;
   highlightCanvas.width = window.innerWidth * dpr;
   highlightCanvas.height = window.innerHeight * dpr;
-
+  
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl2.viewport(0, 0, gl2.canvas.width, gl2.canvas.height);
   projectionMatrix = new DOMMatrix().scaleSelf(2 / window.innerWidth, -2 / window.innerHeight);
@@ -205,7 +205,7 @@ function onResize() {
 function initEventHandlers() {
   let dragging = false;
   const lastPosition = { x: 0, y: 0 };
-
+  
   highlightCanvas.addEventListener("wheel", (e) => {
     e.preventDefault();
     lastPosition.x = e.clientX;
@@ -224,7 +224,7 @@ function initEventHandlers() {
         .translate(x, y)
         .scale(factor)
         .translate(-x, -y);
-
+      
       viewMatrix.preMultiplySelf(zoomMatrix);
     } else {
       viewMatrix.translateSelf(-e.deltaX / viewMatrix.a, -e.deltaY / viewMatrix.d);
@@ -236,19 +236,19 @@ function initEventHandlers() {
     if (dragging) return;
 
     const hexIndex = getHexIndexFromMouseCoords(e.clientX, e.clientY, viewMatrix, config.mapSideLength);
-
+    
     const newMask = makeHexColorMask(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), Math.floor(Math.random() * 2));
     const updatedHexIndices = mapState.logic.setHexOwner(hexIndex, newMask);
-
+    
     modifyBuffer(gl, bufferFill, hexIndex, [newMask]);
-
+    
     for (const hexToUpdateIndex of updatedHexIndices) {
       modifyBuffer(gl, bufferEdge, hexToUpdateIndex, [mapState.data.calculatedEdgeMasks[hexToUpdateIndex]]);
     }
-
-    currentlyHighlighted = UNASSIGNED_PROVINCE_ID;
+    
+    currentlyHighlighted = UNASSIGNED_PROVINCE_ID; 
     highlightHex(e.clientX, e.clientY);
-
+    
     scheduleRender();
 
     dragging = true;
@@ -278,7 +278,7 @@ function initEventHandlers() {
     highlightCanvas.releasePointerCapture(e.pointerId);
     scheduleRender();
   };
-
+  
   highlightCanvas.addEventListener("pointerup", endDrag);
   highlightCanvas.addEventListener("pointerleave", endDrag);
   window.addEventListener("resize", onResize);

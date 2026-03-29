@@ -18,15 +18,15 @@ export class MapLogic {
    */
   setHexOwner(index, value) {
     this.mapData.hexOwners[index] = value;
-
+    
     const updatedHexIndices = [index];
 
     this.#recalculateProvince(index);
-
+    
     const neighbors = getHexNeighbors(index, this.sideLength);
     const hexToUpdateMask = [index, ...neighbors];
     this.#calculateHexMaskIndex(hexToUpdateMask);
-
+    
     for (const neighborIndex of neighbors) {
       updatedHexIndices.push(neighborIndex);
     }
@@ -75,7 +75,7 @@ export class MapLogic {
     const province = this.mapData.provinceHexIdsByProvinceId[provinceId];
     const groups = [];
     const visited = new Set();
-
+    
     for (const startHex of province) {
       if (visited.has(startHex)) continue;
 

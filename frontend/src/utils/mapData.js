@@ -96,11 +96,11 @@ export class MapData {
     const minProvinceCount = 1;
     const initialCount = Math.max(initialProvinceCount, minProvinceCount);
     this.dimensions = calculateMapStateDimensions(hexCount, initialCount);
-
+    
     // Max capacity: provinces cannot exceed hex count in Multiyoy rules.
     const maxProvinceCount = Math.max(hexCount, initialCount);
     const maxDimensions = calculateMapStateDimensions(hexCount, maxProvinceCount);
-
+    
     const buffer = new ArrayBuffer(this.dimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
 
     this.byteArray = new Uint8Array(buffer);
@@ -108,7 +108,7 @@ export class MapData {
     this.hexCount = hexCount;
     this.playerCount = playerCount;
     this.provinceCount = initialCount;
-
+    
     /** @typedef {Set<number>[]} ProvinceHexIdsByProvinceId */
     /** @type {ProvinceHexIdsByProvinceId} */
     this.provinceHexIdsByProvinceId = [new Set()];

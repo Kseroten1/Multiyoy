@@ -62,7 +62,7 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
 
     unassignedHexes[randomIndex] = /** @type {number} */ (unassignedHexes.at(-1));
     unassignedHexes.pop();
-
+    
     const history = [startHex];
     let count = 0;
     let lastAssignedProvinceId = -1;
@@ -100,6 +100,6 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
     yield lastAssignedProvinceId;
     generatedProvinceCount++;
   }
-
+  
   mapLogic.recalculateAllHexEdgeMasks();
 }

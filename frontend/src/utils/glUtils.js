@@ -46,7 +46,7 @@ export function getShaderLocations(context, program) {
     hexIndex: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "u_index")),
     edgeColor: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "u_edgeColor")),
     fillColors: /** @type {WebGLUniformLocation} */ (context.getUniformLocation(program, "FILL_COLORS")),
-
+    
     hexIndexAttrib: /** @type {GLint} */ (context.getAttribLocation(program, "a_hexIndex")),
     edgeMask: /** @type {GLint} */ (context.getAttribLocation(program, "a_edgeMask")),
     fillColorMask: /** @type {GLint} */ (context.getAttribLocation(program, "a_fillColorMask")),

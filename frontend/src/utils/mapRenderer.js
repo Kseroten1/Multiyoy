@@ -28,7 +28,7 @@ export class MapRenderer {
     const indices = new Float32Array(count);
     const owners = new Float32Array(count);
     const edgeMasks = new Float32Array(count);
-
+    
     let i = 0;
     if (provinceHexes) {
       for (const hexIdx of provinceHexes) {
