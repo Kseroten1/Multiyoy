@@ -50,7 +50,7 @@ const {program: secondHexProgram, vao: secondHexVao } = buildWebGLProgram(gl2, v
 const mainHexProgramLocations = getShaderLocations(gl, mainHexProgram);
 const secondHexProgramLocations = getShaderLocations(gl2, secondHexProgram);
 
-const fillRgb = getScaledRgbColors(bInput.value, sInput.value, COLOR_TABLE_FILL);
+const fillRgb = getScaledRgbColors(+bInput.value, +sInput.value, COLOR_TABLE_FILL);
 
 /**
  * @param {WebGL2RenderingContext} context

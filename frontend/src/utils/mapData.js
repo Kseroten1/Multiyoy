@@ -53,40 +53,36 @@ function calculateMapStateDimensions(hexCount, provinceCount) {
   const provinceFinanceStateInBytesPerElement = 4;
   const provinceFinanceStateOffset = currentOffset;
   currentOffset += provinceFinanceStateInBytesPerElement * provinceCount;
+  
+  const chuj =
+    {
+      hexCountInBytes,
+      hexCountOffset,
+      playerCountInBytes,
+      playerCountOffset,
+      currentPlayerInBytes,
+      currentPlayerOffset,
+      currentRoundInBytes,
+      currentRoundOffset,
+      provinceCountInBytes,
+      provinceCountOffset,
+      hexStateInBytesPerElement,
+      hexStateOffset,
+      hexOwnerInBytesPerElement,
+      hexOwnerOffset,
+      hexProvinceIdInBytesPerElement,
+      hexProvinceIdOffset,
+      maxProvinceFinanceInBytes,
+      maxProvinceFinanceOffset,
+      provinceFinanceStateInBytesPerElement,
+      provinceFinanceStateOffset,
+      totalArraySize: currentOffset
+    }
 
-  return ({
-    hexCountInBytes,
-    hexCountOffset,
-    playerCountInBytes,
-    playerCountOffset,
-    currentPlayerInBytes,
-    currentPlayerOffset,
-    currentRoundInBytes,
-    currentRoundOffset,
-    provinceCountInBytes,
-    provinceCountOffset,
-    hexStateInBytesPerElement,
-    hexStateOffset,
-    hexOwnerInBytesPerElement,
-    hexOwnerOffset,
-    hexProvinceIdInBytesPerElement,
-    hexProvinceIdOffset,
-    maxProvinceFinanceInBytes,
-    maxProvinceFinanceOffset,
-    provinceFinanceStateInBytesPerElement,
-    provinceFinanceStateOffset,
-    totalArraySize: currentOffset
-  });
+  return (chuj);
 }
 
 export class MapData {
-  /** @type {Uint8Array} */
-  byteArray;
-  /** @type {DataView} */
-  dataView;
-  /** @type {ReturnType<calculateMapStateDimensions>} */
-  dimensions;
-
   /**
    * @param {number} hexCount
    * @param {number} playerCount
@@ -117,6 +113,9 @@ export class MapData {
     this.calculatedEdgeMasks = new Float32Array(hexCount);
   }
 
+  /**
+     * @param {number} count
+     */
   ensureProvinceCapacity(count) {
     const neededDimensions = calculateMapStateDimensions(this.hexCount, count);
     if (this.byteArray.buffer.byteLength >= neededDimensions.totalArraySize) {
@@ -129,8 +128,8 @@ export class MapData {
     // Invalidate cached views that might depend on total length or provinceCount
     this.#provinceFinanceStates = null;
   }
-
-  #hexCount;
+  
+  /** @type {number} */ #hexCount; 
   get hexCount() {
     this.#hexCount ??= (this.dataView.getUint8(this.dimensions.hexCountOffset) << 16) | this.dataView.getUint16(this.dimensions.hexCountOffset + 1);
     return this.#hexCount;
@@ -142,7 +141,7 @@ export class MapData {
     this.dataView.setUint16(this.dimensions.hexCountOffset + 1, number & 0xffff);
   }
 
-  #playerCount;
+  /** @type {number} */ #playerCount;
   get playerCount() {
     this.#playerCount ??= this.dataView.getUint16(this.dimensions.playerCountOffset);
     return this.#playerCount;
@@ -153,7 +152,7 @@ export class MapData {
     this.dataView.setUint16(this.dimensions.playerCountOffset, value);
   }
 
-  #currentPlayer;
+  /** @type {number} */ #currentPlayer;
   get currentPlayer() {
     this.#currentPlayer ??= this.dataView.getUint16(this.dimensions.currentPlayerOffset);
     return this.#currentPlayer;
@@ -164,7 +163,7 @@ export class MapData {
     this.dataView.setUint16(this.dimensions.currentPlayerOffset, value);
   }
 
-  #currentRound;
+  /** @type {number} */ #currentRound;
   get currentRound() {
     this.#currentRound ??= this.dataView.getUint32(this.dimensions.currentRoundOffset);
     return this.#currentRound;
@@ -175,7 +174,7 @@ export class MapData {
     this.dataView.setUint32(this.dimensions.currentRoundOffset, value);
   }
 
-  #provinceCount;
+  /** @type {number} */ #provinceCount;
   get provinceCount() {
     this.#provinceCount ??= this.dataView.getUint32(this.dimensions.provinceCountOffset);
     return this.#provinceCount;
@@ -188,7 +187,7 @@ export class MapData {
     this.#provinceFinanceStates = null;
   }
 
-  #hexStates;
+  /** @type {Uint8Array} */#hexStates;
   get hexStates() {
     return this.#hexStates ??= new Uint8Array(this.byteArray.buffer, this.dimensions.hexStateOffset, this.dimensions.hexStateInBytesPerElement * this.hexCount);
   }
@@ -197,12 +196,12 @@ export class MapData {
     this.byteArray.set(value, this.dimensions.hexStateOffset);
   }
 
-  #hexOwners;
+  /** @type {Uint16Array} */ #hexOwners;
   get hexOwners() {
     return this.#hexOwners ??= new Uint16Array(this.byteArray.buffer, this.dimensions.hexOwnerOffset, this.hexCount);
   }
 
-  #hexProvinceIds;
+  /** @type {Uint32Array} */ #hexProvinceIds;
   get hexProvinceIds() {
     return this.#hexProvinceIds ??= new Uint32Array(this.byteArray.buffer, this.dimensions.hexProvinceIdOffset, this.hexCount);
   }
@@ -211,7 +210,7 @@ export class MapData {
     this.hexProvinceIds.set(value);
   }
 
-  #maxProvinceFinance;
+  /** @type {number} */ #maxProvinceFinance;
   get maxProvinceFinance() {
     this.#maxProvinceFinance ??= this.dataView.getUint32(this.dimensions.maxProvinceFinanceOffset);
     return this.#maxProvinceFinance;
@@ -222,7 +221,7 @@ export class MapData {
     this.dataView.setUint32(this.dimensions.maxProvinceFinanceOffset, value);
   }
 
-  #provinceFinanceStates;
+  /** @type {Uint32Array} */ #provinceFinanceStates;
   get provinceFinanceStates() {
     return this.#provinceFinanceStates ??= new Uint32Array(this.byteArray.buffer, this.dimensions.provinceFinanceStateOffset, this.provinceCount);
   }

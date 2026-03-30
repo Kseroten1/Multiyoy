@@ -38,8 +38,8 @@ export function convertOklchToRgb(L, C, H) {
 
 
 /**
- * @param brightness
- * @param saturation
+ * @param brightness {number}
+ * @param saturation {number}
  * @param colors {[number,number,number][]}
  * @returns {Float32Array}
  */

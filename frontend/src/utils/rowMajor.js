@@ -1,19 +1,36 @@
+/**
+ * @param {number} q
+ * @param {number} r
+ * @param {number} width
+ */
 export function encodeRowMajor(q, r, width) {
   const col = q + Math.floor(r / 2);
   const row = r;
   return row * width + col;
 }
 
+/**
+ * @param {number} index
+ * @param {number} width
+ */
 export function decodeRowMajorR(index, width) {
   return Math.floor(index / width);
 }
 
+/**
+ * @param {number} index
+ * @param {number} width
+ */
 export function decodeRowMajorQ(index, width) {
   const r = Math.floor(index / width);
   const col = index % width;
   return col - Math.floor(r / 2);
 }
 
+/**
+ * @param {number} index
+ * @param {number} width
+ */
 export function decodeRowMajor(index, width) {
   const r = decodeRowMajorR(index, width);
   const col = index % width;

@@ -1,9 +1,15 @@
 import {screenToWorld} from "./math.js";
 import {INVALID_HEX_INDEX} from "./config.js";
 
+/**
+ * 
+ * @param index {number}
+ * @param sideLength {number}
+ * @returns {number[]}
+ */
 export function getHexNeighbors(index, sideLength) {
   const r = Math.floor(index / sideLength);
-  const isRowOdd = (r & 1) !== 0;
+  const isRowOdd = +((r & 1) !== 0);
   const c = index % sideLength;
 
   const neighbors = [];
