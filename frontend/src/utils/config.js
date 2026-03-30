@@ -1,8 +1,30 @@
+export const UNASSIGNED_PROVINCE_ID = 0;
+export const INVALID_HEX_INDEX = -1;
 
-export const COLOR_TABLE_FILL = [
+export const COLOR_TABLE_FILL = /** @type {[number,number,number][]} */ ([
     [0.2575, 0.072, 254.83], [0.5398, 0.183, 254.16], [0.7804, 0.099, 228.76],
     [0.7138, 0.069, 199.93], [0.5092, 0.226, 315.1], [0.6683, 0.228, 320.18],
     [0.3638, 0.115, 2.33], [0.6116, 0.181, 28.49], [0.7377, 0.173, 62.66],
     [0.9177, 0.190, 97.52], [0.5217, 0.084, 157.93], [0.7551, 0.146, 142.3],
     [0.8758, 0.154, 156.62], [0.6886, 0.003, 264.0]
-];
+]);
+
+export const MAP_SIDE_LENGTH = {
+  SMALL: 32,
+  MEDIUM: 64,
+  LARGE: 128,
+  HUGE: 256,
+  EXTRA: 512,
+  YEAR10: 1024,
+  LIFETIME: 2048
+};
+
+export const PLAYER_COUNTS = {
+  [MAP_SIDE_LENGTH.SMALL]: 4,
+  [MAP_SIDE_LENGTH.MEDIUM]: 16,
+  [MAP_SIDE_LENGTH.LARGE]: 32,
+  [MAP_SIDE_LENGTH.HUGE]: 64,
+  [MAP_SIDE_LENGTH.EXTRA]: 128,
+  [MAP_SIDE_LENGTH.YEAR10]: 256,
+  [MAP_SIDE_LENGTH.LIFETIME]: 378
+};
