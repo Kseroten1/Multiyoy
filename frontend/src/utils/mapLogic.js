@@ -19,17 +19,12 @@ export class MapLogic {
   setHexOwner(index, value) {
     this.mapData.hexOwners[index] = value;
     
-    const updatedHexIndices = [index];
+    const neighbors = getHexNeighbors(index, this.sideLength);
+    const updatedHexIndices = [index, ...neighbors];
 
     this.#recalculateProvince(index);
     
-    const neighbors = getHexNeighbors(index, this.sideLength);
-    const hexToUpdateMask = [index, ...neighbors];
-    this.#calculateHexMaskIndex(hexToUpdateMask);
-    
-    for (const neighborIndex of neighbors) {
-      updatedHexIndices.push(neighborIndex);
-    }
+    this.#calculateHexMaskIndex(updatedHexIndices);
 
     return updatedHexIndices;
   }
@@ -232,12 +227,31 @@ export class MapLogic {
     }
   }
 
+  rebuildProvinceData() {
+    const totalHexCount = this.mapData.hexCount;
+    const hexProvinceIds = this.mapData.hexProvinceIds;
+    
+    // Clear and prepare the province array
+    this.mapData.provinceHexIdsByProvinceId = [];
+    
+    for (let i = 0; i < totalHexCount; i++) {
+      const pId = hexProvinceIds[i];
+      if (pId === UNASSIGNED_PROVINCE_ID) continue;
+      
+      if (!this.mapData.provinceHexIdsByProvinceId[pId]) {
+        this.mapData.provinceHexIdsByProvinceId[pId] = new Set();
+      }
+      this.mapData.provinceHexIdsByProvinceId[pId].add(i);
+    }
+    
+    this.mapData.provinceCount = this.mapData.provinceHexIdsByProvinceId.length;
+  }
+
   recalculateAllHexEdgeMasks() {
     const sideLength = this.sideLength;
     const totalHexCount = this.mapData.hexCount;
     const hexOwners = this.mapData.hexOwners;
-    const calculatedEdgeMasks = this.mapData.calculatedEdgeMasks;
-
+    this.mapData.calculatedEdgeMasks.fill(0);
     for (let i = 0; i < totalHexCount; i++) {
       const row = Math.floor(i / sideLength);
       const column = i % sideLength;
@@ -247,8 +261,8 @@ export class MapLogic {
         const currentOwner = hexOwners[i];
         const rightOwner = hexOwners[i + 1];
         if (currentOwner !== rightOwner) {
-          calculatedEdgeMasks[i] |= 0b000010;
-          calculatedEdgeMasks[i + 1] |= 0b010000;
+          this.mapData.calculatedEdgeMasks[i] |= 0b000010;
+          this.mapData.calculatedEdgeMasks[i + 1] |= 0b010000;
         }
       }
 
@@ -259,15 +273,15 @@ export class MapLogic {
 
         if (column + colOffset < sideLength) {
           if (currentOwner !== hexOwners[indexDownRight]) {
-            calculatedEdgeMasks[i] |= 0b000001;
-            calculatedEdgeMasks[indexDownRight] |= 0b001000;
+            this.mapData.calculatedEdgeMasks[i] |= 0b000001;
+            this.mapData.calculatedEdgeMasks[indexDownRight] |= 0b001000;
           }
         }
 
         if (column + colOffset - 1 >= 0) {
           if (currentOwner !== hexOwners[indexDownLeft]) {
-            calculatedEdgeMasks[i] |= 0b100000;
-            calculatedEdgeMasks[indexDownLeft] |= 0b000100;
+            this.mapData.calculatedEdgeMasks[i] |= 0b100000;
+            this.mapData.calculatedEdgeMasks[indexDownLeft] |= 0b000100;
           }
         }
       }

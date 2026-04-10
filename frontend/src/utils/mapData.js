@@ -53,7 +53,13 @@ function calculateMapStateDimensions(hexCount, provinceCount) {
   const provinceFinanceStateInBytesPerElement = 4;
   const provinceFinanceStateOffset = currentOffset;
   currentOffset += provinceFinanceStateInBytesPerElement * provinceCount;
-  
+
+  // Align for Float32Array (4 bytes)
+  if (currentOffset % 4 !== 0) currentOffset += (4 - (currentOffset % 4));
+  const calculatedEdgeMasksInBytesPerElement = 4;
+  const calculatedEdgeMasksOffset = currentOffset;
+  currentOffset += calculatedEdgeMasksInBytesPerElement * hexCount;
+
   const chuj =
     {
       hexCountInBytes,
@@ -76,6 +82,8 @@ function calculateMapStateDimensions(hexCount, provinceCount) {
       maxProvinceFinanceOffset,
       provinceFinanceStateInBytesPerElement,
       provinceFinanceStateOffset,
+      calculatedEdgeMasksInBytesPerElement,
+      calculatedEdgeMasksOffset,
       totalArraySize: currentOffset
     }
 
@@ -87,8 +95,9 @@ export class MapData {
    * @param {number} hexCount
    * @param {number} playerCount
    * @param {number} initialProvinceCount
+   * @param {ArrayBuffer | SharedArrayBuffer} [sharedBuffer]
    */
-  constructor(hexCount, playerCount, initialProvinceCount = 0) {
+  constructor(hexCount, playerCount, initialProvinceCount = 0, sharedBuffer) {
     const minProvinceCount = 1;
     const initialCount = Math.max(initialProvinceCount, minProvinceCount);
     this.dimensions = calculateMapStateDimensions(hexCount, initialCount);
@@ -97,10 +106,18 @@ export class MapData {
     const maxProvinceCount = Math.max(hexCount, initialCount);
     const maxDimensions = calculateMapStateDimensions(hexCount, maxProvinceCount);
     
-    const buffer = new ArrayBuffer(this.dimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
-
-    this.byteArray = new Uint8Array(buffer);
-    this.dataView = new DataView(buffer);
+    if (typeof SharedArrayBuffer === 'undefined') {
+      console.warn("SharedArrayBuffer is not available. Falling back to ArrayBuffer. Map generation will not be shared between threads properly.");
+      // Fallback to regular ArrayBuffer if SharedArrayBuffer is not supported or allowed
+      const buffer = sharedBuffer ?? new ArrayBuffer(maxDimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
+      this.byteArray = new Uint8Array(buffer);
+      this.dataView = new DataView(buffer);
+    } else {
+      const buffer = sharedBuffer ?? new SharedArrayBuffer(maxDimensions.totalArraySize);
+      this.byteArray = new Uint8Array(buffer);
+      this.dataView = new DataView(buffer);
+    }
+    
     this.hexCount = hexCount;
     this.playerCount = playerCount;
     this.provinceCount = initialCount;
@@ -108,9 +125,6 @@ export class MapData {
     /** @typedef {Set<number>[]} ProvinceHexIdsByProvinceId */
     /** @type {ProvinceHexIdsByProvinceId} */
     this.provinceHexIdsByProvinceId = [new Set()];
-
-    /** @type {Float32Array} */
-    this.calculatedEdgeMasks = new Float32Array(hexCount);
   }
 
   /**
@@ -122,7 +136,9 @@ export class MapData {
       return;
     }
 
-    this.byteArray.buffer.resize(neededDimensions.totalArraySize);
+    if (this.byteArray.buffer instanceof ArrayBuffer) {
+      this.byteArray.buffer.resize(neededDimensions.totalArraySize);
+    }
     this.dimensions = neededDimensions;
 
     // Invalidate cached views that might depend on total length or provinceCount
@@ -228,5 +244,14 @@ export class MapData {
 
   set provinceFinanceStates(value) {
     this.provinceFinanceStates.set(value);
+  }
+
+  /** @type {Float32Array} */ #calculatedEdgeMasks;
+  get calculatedEdgeMasks() {
+    return this.#calculatedEdgeMasks ??= new Float32Array(this.byteArray.buffer, this.dimensions.calculatedEdgeMasksOffset, this.hexCount);
+  }
+
+  set calculatedEdgeMasks(value) {
+    this.calculatedEdgeMasks.set(value);
   }
 }
