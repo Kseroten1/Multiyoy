@@ -106,17 +106,9 @@ export class MapData {
     const maxProvinceCount = Math.max(hexCount, initialCount);
     const maxDimensions = calculateMapStateDimensions(hexCount, maxProvinceCount);
     
-    if (typeof SharedArrayBuffer === 'undefined') {
-      console.warn("SharedArrayBuffer is not available. Falling back to ArrayBuffer. Map generation will not be shared between threads properly.");
-      // Fallback to regular ArrayBuffer if SharedArrayBuffer is not supported or allowed
-      const buffer = sharedBuffer ?? new ArrayBuffer(maxDimensions.totalArraySize, { maxByteLength: maxDimensions.totalArraySize });
-      this.byteArray = new Uint8Array(buffer);
-      this.dataView = new DataView(buffer);
-    } else {
-      const buffer = sharedBuffer ?? new SharedArrayBuffer(maxDimensions.totalArraySize);
-      this.byteArray = new Uint8Array(buffer);
-      this.dataView = new DataView(buffer);
-    }
+    const buffer = sharedBuffer ?? new SharedArrayBuffer(maxDimensions.totalArraySize);
+    this.byteArray = new Uint8Array(buffer);
+    this.dataView = new DataView(buffer);
     
     this.hexCount = hexCount;
     this.playerCount = playerCount;
@@ -136,9 +128,6 @@ export class MapData {
       return;
     }
 
-    if (this.byteArray.buffer instanceof ArrayBuffer) {
-      this.byteArray.buffer.resize(neededDimensions.totalArraySize);
-    }
     this.dimensions = neededDimensions;
 
     // Invalidate cached views that might depend on total length or provinceCount
@@ -249,9 +238,5 @@ export class MapData {
   /** @type {Float32Array} */ #calculatedEdgeMasks;
   get calculatedEdgeMasks() {
     return this.#calculatedEdgeMasks ??= new Float32Array(this.byteArray.buffer, this.dimensions.calculatedEdgeMasksOffset, this.hexCount);
-  }
-
-  set calculatedEdgeMasks(value) {
-    this.calculatedEdgeMasks.set(value);
   }
 }
