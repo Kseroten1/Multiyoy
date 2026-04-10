@@ -60,7 +60,7 @@ function calculateMapStateDimensions(hexCount, provinceCount) {
   const calculatedEdgeMasksOffset = currentOffset;
   currentOffset += calculatedEdgeMasksInBytesPerElement * hexCount;
 
-  const chuj =
+  const bufferLayout =
     {
       hexCountInBytes,
       hexCountOffset,
@@ -87,7 +87,7 @@ function calculateMapStateDimensions(hexCount, provinceCount) {
       totalArraySize: currentOffset
     }
 
-  return (chuj);
+  return (bufferLayout);
 }
 
 export class MapData {
