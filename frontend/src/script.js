@@ -115,9 +115,9 @@ const secondHexIndexBuffer = initBuffer(
 onResize();
 scheduleRender();
 initEventHandlers();
-void startMapGenerationWorker();
+void animateMapGeneration();
 
-function startMapGenerationWorker() {
+function animateMapGeneration() {
   const worker = new Worker(new URL('./mapWorker.js', import.meta.url), { type: 'module' });
   
   worker.postMessage({
@@ -125,8 +125,18 @@ function startMapGenerationWorker() {
     sharedBuffer: mapState.data.byteArray.buffer
   });
 
+  let isGenerating = true;
+  const pollProgress = () => {
+    if (!isGenerating) return;
+    modifyBuffer(gl, bufferFill, 0, mapState.renderer.fillMasksArray);
+    scheduleRender();
+    requestAnimationFrame(pollProgress);
+  };
+  requestAnimationFrame(pollProgress);
+
   worker.onmessage = (e) => {
     if (e.data.type === 'COMPLETE') {
+      isGenerating = false;
       mapState.logic.rebuildProvinceData();
       
       modifyBuffer(gl, bufferFill, 0, mapState.renderer.fillMasksArray);
