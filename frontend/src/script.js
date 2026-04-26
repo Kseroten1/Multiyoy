@@ -9,7 +9,7 @@ import {getHexIndexFromMouseCoords} from "./utils/hexLogicHelper.js";
 import {MapState} from "./utils/mapState.js";
 import {generateSlayLikeMap} from "./utils/mapGenerator.js";
 
-const selectedMapSideLength = MAP_SIDE_LENGTH.SMALL;
+const selectedMapSideLength = MAP_SIDE_LENGTH.LIFETIME;
 
 const config = {
   defaultBorderWidth: 0.1,
