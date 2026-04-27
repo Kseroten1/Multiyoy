@@ -7,7 +7,6 @@ import {updateBrightnessAndSaturationMax} from "./utils/updateBrightnessAndSatur
 import {makeHexColorMask} from "./utils/math.js";
 import {getHexIndexFromMouseCoords} from "./utils/hexLogicHelper.js";
 import {MapState} from "./utils/mapState.js";
-import {generateSlayLikeMap} from "./utils/mapGenerator.js";
 
 const selectedMapSideLength = MAP_SIDE_LENGTH.LIFETIME;
 
@@ -40,7 +39,11 @@ const gl = /** @type {WebGL2RenderingContext} */ (mainCanvas.getContext("webgl2"
 const gl2 = /** @type {WebGL2RenderingContext} */ (highlightCanvas.getContext("webgl2", canvasOptions));
 
 // Used for controls related calculations (camera origin, zoom, pan)
-const viewMatrix = new DOMMatrix().scaleSelf(0.8);
+const viewMatrix = new DOMMatrix();
+// Center the view 
+const centerX = (config.mapSideLength - 1) * 1.73205081 * 0.5;
+const centerY = (config.mapSideLength - 1) * 1.5 * 0.5;
+viewMatrix.scaleSelf(600 / config.mapSideLength).translateSelf(-centerX, -centerY);
 // Used for window related calculations (window size, device pixel ratio)
 let projectionMatrix = new DOMMatrix();
 
@@ -114,38 +117,34 @@ scheduleRender();
 initEventHandlers();
 void animateMapGeneration();
 
+function animateMapGeneration() {
+  const worker = new Worker(new URL('./mapWorker.js', import.meta.url), { type: 'module' });
+  
+  worker.postMessage({
+    config,
+    sharedBuffer: mapState.data.byteArray.buffer
+  });
 
-/**
- * 
- * @param generator {Iterable<number>} An iterable that yields provinceIds.
- * @param batchSize {number} The number of provinces to process before calling onUpdate.
- * @param onUpdate { () => void } A callback function to update buffers and schedule a render.
- */
-async function processInBatches(generator, batchSize, onUpdate) {
-  let count = 0;
-  for (const _ of generator) {
-    count++;
-    if (count % batchSize === 0) {
-      onUpdate?.();
-      await new Promise(requestAnimationFrame);
-    }
-  }
-  onUpdate?.();
-}
+  let isGenerating = true;
+  const pollProgress = () => {
+    if (!isGenerating) return;
+    modifyBuffer(gl, bufferFill, 0, mapState.renderer.fillMasksArray);
+    scheduleRender();
+    requestAnimationFrame(pollProgress);
+  };
+  requestAnimationFrame(pollProgress);
 
-async function animateMapGeneration() {
-  const batchSize = Math.ceil(config.mapSideLength) * 5;
-  await processInBatches(
-    generateSlayLikeMap(mapState.data, mapState.logic),
-    batchSize,
-    () => {
+  worker.onmessage = (e) => {
+    if (e.data.type === 'COMPLETE') {
+      isGenerating = false;
+      mapState.logic.rebuildProvinceData();
+      
       modifyBuffer(gl, bufferFill, 0, mapState.renderer.fillMasksArray);
+      modifyBuffer(gl, bufferEdge, 0, mapState.data.calculatedEdgeMasks);
       scheduleRender();
-    },
-  );
-
-  modifyBuffer(gl, bufferEdge, 0, mapState.data.calculatedEdgeMasks);
-  scheduleRender();
+      console.log('Map generation complete');
+    }
+  };
 }
 
 let currentlyHighlighted = UNASSIGNED_PROVINCE_ID;

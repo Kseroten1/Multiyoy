@@ -10,9 +10,10 @@ export class MapState {
   /**
    * @param {number} playerCount
    * @param {number} hexCount
+   * @param {ArrayBuffer | SharedArrayBuffer} [sharedBuffer]
    */
-  constructor(playerCount, hexCount) {
-    this.data = new MapData(hexCount, playerCount);
+  constructor(playerCount, hexCount, sharedBuffer) {
+    this.data = new MapData(hexCount, playerCount, 0, sharedBuffer);
     this.logic = new MapLogic(this.data);
     this.renderer = new MapRenderer(this.data);
   }

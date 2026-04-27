@@ -29,7 +29,7 @@ export function createHexOwners(playerCount) {
  * @param {MapData} mapData
  * @param {MapLogic} mapLogic
  */
-export function* generateSlayLikeMap(mapData, mapLogic) {
+export function generateSlayLikeMap(mapData, mapLogic) {
   const hexCount = mapData.hexCount;
   const sideLength = Math.sqrt(hexCount);
   const playerCount = mapData.playerCount;
@@ -97,7 +97,6 @@ export function* generateSlayLikeMap(mapData, mapLogic) {
       }
     }
 
-    yield lastAssignedProvinceId;
     generatedProvinceCount++;
   }
   
